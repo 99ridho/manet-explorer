@@ -1,0 +1,4 @@
+/* Tailwind entry. index.css is the theme from SPEC.md §5 and must stay verbatim, so
+   anything extra (shadcn's tw-animate-css) is layered on here instead. */
+@import "./index.css";
+@import "tw-animate-css";
