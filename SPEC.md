@@ -278,7 +278,7 @@ As in dsa-course Section 8, with these differences.
   - Links are lines. `broken` is dashed; `virtual` is dotted and carries its own label ("tunnel", "toward D"); a link with `quality` shows the value on hover and focus; a link with `bandwidth` always shows it.
   - Nodes are circles labeled with their id. Roles draw as follows: `source` and `dest` get a filled accent ring and the letters S or D beside the node when the id is not already S or D; `mpr`, `head`, and `gateway` get a ring (solid, double, dashed); `malicious` fills the node with `--color-destructive`; `anchor` gets a square.
   - Hovering or focusing a node draws its range circle at `range`. Nodes are focusable with Tab and announce "`{id}`, `{k}` neighbors, roles `{roles}`".
-  - An optional `nodeLabels` prop (a component prop, not a snapshot field) draws a caption of short lines under a node and adds its spoken form to the node's label; Section 10.7 uses it for addresses.
+  - An optional `nodeLabels` prop (a component prop, not a snapshot field) draws a caption of short lines under a node, or above it when the caption says `place: 'above'`, and adds its spoken form to the node's label; Section 10.5 uses it for positions and distances, Section 10.7 for addresses.
   - `packets` draw as a dot on the link from `from` to `to` (or rings on every link for `"*"`) with the message name as a small label, animated with `motion/react` over 60 % of the step interval.
   - The canvas `aria-label` summarizes the snapshot: "`{n}` nodes, `{m}` links" plus ", path `{path}`" when `highlight.path` is set.
 - **`MetricsBars`**: the Section 9.1 result, drawn inside the canvas card in place of the network on the last step of a metrics run: one group per metric, two bars per group (chosen variant first), each with its value as text. Colors follow the dataviz rule of the theme (`--color-chart-1` for the chosen variant, `--color-chart-3` for the other).
@@ -811,6 +811,8 @@ The greedy rule forwards to the neighbor closest to the destination and only if 
 | Delivered | 18 | "The packet reaches `{dst}` after `{h}` hops." | `{dst}` found, path tree |
 
 Distances print to two decimals, and every step carries `variables.dist`. On the seed: S is 2.00 from D and both its neighbors are farther, so the void step fires at S; the walk goes S, A, B, C; C is 1.80 from D, so greedy resumes; E, then D. The path is S, A, B, C, E, D, the slide's route. The greedy-only variant drops the packet at S. A route between another pair moves the dotted direction line and the source and destination roles to that pair.
+
+The canvas captions every node with its position in slide units, "(2, 2)", and, on a second line, its distance to the destination, "2.00 to D" (spoken "at 2, 2, 2.00 from D"), through `NetworkCanvas`'s `nodeLabels` prop. The destination shows only its position. The captions follow the destination role, so a route between another pair measures to its new destination. In node order, a caption moves above its node when that covers less of the nodes, the link label, and the captions around it; on the seed, S and F carry theirs above.
 
 **Live fields:** `hops`, `mode` (`greedy` or `face`, since `perimeter` does not fit a 14-character chip), `voids`, `dist` (current node to destination).
 

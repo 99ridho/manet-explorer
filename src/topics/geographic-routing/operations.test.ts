@@ -1,6 +1,6 @@
 // Executable form of the SPEC.md §10.5 step table and seed results.
 import { describe, expect, it } from 'vitest'
-import { gabriel, randomNetwork, runRoute, seedNetwork } from './operations'
+import { gabriel, geoLabels, randomNetwork, runRoute, seedNetwork } from './operations'
 
 describe('route S to D on the seed, greedy with perimeter', () => {
   const { steps, finalSnapshot } = runRoute(seedNetwork('perimeter'), 'S D')
@@ -89,5 +89,25 @@ describe('randomize', () => {
       expect(s.nodes.at(-1)?.id).toBe('D')
       expect(runRoute(s, 'S D').finalSnapshot.path.at(-1)).toBe('D')
     }
+  })
+})
+
+describe('node captions', () => {
+  it('give each seed node its position and its distance to D', () => {
+    const labels = geoLabels(seedNetwork())
+    expect(labels.S).toEqual({ lines: ['(2, 2)', '2.00 to D'], spoken: 'at 2, 2, 2.00 from D', place: 'above' })
+    expect(labels.C.lines).toEqual(['(3.4, 0.3)', '1.80 to D'])
+    expect(labels.D).toEqual({ lines: ['(4, 2)'], spoken: 'at 4, 2' })
+  })
+
+  it('move a caption above its node where the one below would cover a neighbor', () => {
+    const labels = geoLabels(seedNetwork())
+    expect(Object.keys(labels).filter((id) => labels[id].place === 'above')).toEqual(['S', 'F'])
+  })
+
+  it('measure to the new destination after a route between another pair', () => {
+    const labels = geoLabels(runRoute(seedNetwork(), 'A E').finalSnapshot)
+    expect(labels.D.lines).toEqual(['(4, 2)', '0.95 to E'])
+    expect(labels.E.lines).toEqual(['(4.3, 1.1)'])
   })
 })

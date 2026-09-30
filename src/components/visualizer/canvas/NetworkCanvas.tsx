@@ -31,6 +31,8 @@ function summary(snap: NetSnapshot): string {
 export interface NodeCaption {
   lines: string[]
   spoken: string
+  /** Above the node instead of below, for when a neighbor sits where the caption would go. */
+  place?: 'above'
 }
 
 export function NetworkCanvas({ snapshot, nodeLabels }: { snapshot: NetSnapshot; nodeLabels?: Record<string, NodeCaption> }) {
@@ -189,10 +191,10 @@ export function NetworkCanvas({ snapshot, nodeLabels }: { snapshot: NetSnapshot;
                   {endpoint}
                 </text>
               )}
-              {nodeLabels?.[n.id]?.lines.map((line, i) => (
+              {nodeLabels?.[n.id]?.lines.map((line, i, all) => (
                 <text
                   key={i}
-                  y={R + 14 + i * 13}
+                  y={nodeLabels[n.id].place === 'above' ? -R - 10 - (all.length - 1 - i) * 13 : R + 16 + i * 13}
                   textAnchor="middle"
                   fontSize={11}
                   fontFamily="var(--font-mono)"
