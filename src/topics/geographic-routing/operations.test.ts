@@ -93,16 +93,31 @@ describe('randomize', () => {
 })
 
 describe('node captions', () => {
-  it('give each seed node its position and its distance to D', () => {
+  it('give each seed node its position and its distance to D, shown on hover at rest', () => {
     const labels = geoLabels(seedNetwork())
-    expect(labels.S).toEqual({ lines: ['(2, 2)', '2.00 to D'], spoken: 'at 2, 2, 2.00 from D', place: 'above' })
+    expect(labels.S).toMatchObject({ lines: ['(2, 2)', '2.00 to D'], spoken: 'at 2, 2, 2.00 from D', hover: true })
     expect(labels.C.lines).toEqual(['(3.4, 0.3)', '1.80 to D'])
-    expect(labels.D).toEqual({ lines: ['(4, 2)'], spoken: 'at 4, 2' })
+    expect(labels.D).toEqual({ lines: ['(4, 2)'], spoken: 'at 4, 2', hover: true })
+    expect(Object.values(labels).every((c) => c.hover)).toBe(true)
+  })
+
+  const shown = (labels: ReturnType<typeof geoLabels>) => Object.keys(labels).filter((id) => !labels[id].hover)
+  const { steps } = runRoute(seedNetwork(), 'S D')
+
+  it('show S and both its neighbors at the void, the three distances greedy compares', () => {
+    const labels = geoLabels(steps[1].snapshot)
+    expect(shown(labels)).toEqual(['S', 'F', 'A'])
+    expect([labels.S, labels.F, labels.A].map((c) => c.lines[1])).toEqual(['2.00 to D', '2.86 to D', '2.79 to D'])
+  })
+
+  it('show the sender and its neighbors on a greedy hop', () => {
+    const hop = steps.find((s) => s.highlightLine === 8)!
+    expect(hop.snapshot.packets[0]).toMatchObject({ from: 'C', to: 'E' })
+    expect(shown(geoLabels(hop.snapshot))).toEqual(['B', 'C', 'E'])
   })
 
   it('move a caption above its node where the one below would cover a neighbor', () => {
-    const labels = geoLabels(seedNetwork())
-    expect(Object.keys(labels).filter((id) => labels[id].place === 'above')).toEqual(['S', 'F'])
+    expect(geoLabels(steps[1].snapshot).F.place).toBe('above')
   })
 
   it('measure to the new destination after a route between another pair', () => {

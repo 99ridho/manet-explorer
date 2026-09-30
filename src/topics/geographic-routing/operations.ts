@@ -75,16 +75,21 @@ function withDirection(s: GeoSnapshot, src: string, dst: string): GeoSnapshot {
 
 const fmt = (d: number) => d.toFixed(2)
 
-/** Each node's position, and its distance to the destination on a second line. */
+/**
+ * Each node's position, and its distance to the destination on a second line. At rest every caption
+ * waits for hover or focus; on a step the node deciding the next hop and its neighbors show theirs.
+ */
 export function geoLabels(s: GeoSnapshot): Record<string, NodeCaption> {
   const dst = s.nodes.find((n) => n.roles.includes('dest'))
+  const anchor = s.highlight ? (s.packets[0]?.from ?? s.flow?.at) : undefined
+  const shown = new Set(anchor ? [anchor, ...neighbors(s, anchor)] : [])
   // Boxes in slide units: 11px mono text is 0.11 wide per character plus 0.04 of halo, a line is
   // 0.22 tall, the first line starts 0.38 from the node's center, and a node's circle has radius 0.25.
   type Box = { x0: number; x1: number; y0: number; y1: number }
   const overlap = (a: Box, b: Box) =>
     Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0))
   const byId = new Map(s.nodes.map((n) => [n.id, n]))
-  const circles: Box[] = s.nodes.map((n) => ({ x0: n.x - 0.25, x1: n.x + 0.25, y0: n.y - 0.25, y1: n.y + 0.25 }))
+  const fixed: Box[] = s.nodes.map((n) => ({ x0: n.x - 0.25, x1: n.x + 0.25, y0: n.y - 0.25, y1: n.y + 0.25 }))
   // A link label sits just above its link's midpoint.
   for (const l of s.links) {
     const text = s.linkLabels?.[linkKey(l.a, l.b)]
@@ -94,13 +99,14 @@ export function geoLabels(s: GeoSnapshot): Record<string, NodeCaption> {
     const mx = (a.x + b.x) / 2
     const my = (a.y + b.y) / 2
     const half = (text.length * 0.11) / 2 + 0.04
-    circles.push({ x0: mx - half, x1: mx + half, y0: my + 0.1, y1: my + 0.3 })
+    fixed.push({ x0: mx - half, x1: mx + half, y0: my + 0.1, y1: my + 0.3 })
   }
   const captions = s.nodes.map((n): NodeCaption => {
     const at = `${n.x}, ${n.y}`
-    if (!dst || n.id === dst.id) return { lines: [`(${at})`], spoken: `at ${at}` }
+    const hover = shown.has(n.id) ? {} : { hover: true }
+    if (!dst || n.id === dst.id) return { lines: [`(${at})`], spoken: `at ${at}`, ...hover }
     const d = fmt(dist(n, dst))
-    return { lines: [`(${at})`, `${d} to ${dst.id}`], spoken: `at ${at}, ${d} from ${dst.id}` }
+    return { lines: [`(${at})`, `${d} to ${dst.id}`], spoken: `at ${at}, ${d} from ${dst.id}`, ...hover }
   })
   const sides = s.nodes.map((n, i) => {
     const half = (Math.max(...captions[i].lines.map((l) => l.length)) * 0.11) / 2 + 0.04
@@ -108,11 +114,12 @@ export function geoLabels(s: GeoSnapshot): Record<string, NodeCaption> {
     const below = { x0: n.x - half, x1: n.x + half, y0: n.y - 0.38 - height, y1: n.y - 0.38 }
     return { below, above: { ...below, y0: n.y + 0.38, y1: n.y + 0.38 + height } }
   })
-  // In node order, a caption moves above when that overlaps less; later captions count as below.
+  // In node order, a caption moves above when that overlaps less. Only captions on screen count,
+  // and one not yet placed counts as below.
   const placed = sides.map((b) => b.below)
   const out: Record<string, NodeCaption> = {}
   s.nodes.forEach((n, i) => {
-    const others = [...circles, ...placed.filter((_, j) => j !== i)]
+    const others = [...fixed, ...placed.filter((_, j) => j !== i && shown.has(s.nodes[j].id))]
     const crowd = (b: Box) => others.reduce((sum, t) => sum + overlap(t, b), 0)
     const useAbove = crowd(sides[i].above) < crowd(sides[i].below)
     if (useAbove) placed[i] = sides[i].above

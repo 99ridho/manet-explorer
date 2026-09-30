@@ -33,6 +33,8 @@ export interface NodeCaption {
   spoken: string
   /** Above the node instead of below, for when a neighbor sits where the caption would go. */
   place?: 'above'
+  /** Drawn only while the node is hovered or focused; the spoken form is always in the label. */
+  hover?: boolean
 }
 
 export function NetworkCanvas({ snapshot, nodeLabels }: { snapshot: NetSnapshot; nodeLabels?: Record<string, NodeCaption> }) {
@@ -191,7 +193,8 @@ export function NetworkCanvas({ snapshot, nodeLabels }: { snapshot: NetSnapshot;
                   {endpoint}
                 </text>
               )}
-              {nodeLabels?.[n.id]?.lines.map((line, i, all) => (
+              {(!nodeLabels?.[n.id]?.hover || focused === n.id) &&
+                nodeLabels?.[n.id]?.lines.map((line, i, all) => (
                 <text
                   key={i}
                   y={nodeLabels[n.id].place === 'above' ? -R - 10 - (all.length - 1 - i) * 13 : R + 16 + i * 13}
