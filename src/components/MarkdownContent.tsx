@@ -1,6 +1,7 @@
 // Renders the verbatim course markdown (content.ts) with theme-aware Tailwind classes.
 // No typography plugin so src/index.css stays untouched.
 import Markdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 const components: Components = {
   h2: ({ children }) => <h2 className="mt-8 text-xl font-semibold tracking-tight">{children}</h2>,
@@ -21,12 +22,21 @@ const components: Components = {
   code: ({ children }) => <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">{children}</code>,
   pre: ({ children }) => <pre className="my-4 overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm">{children}</pre>,
   hr: () => <hr className="my-6" />,
+  // The references quote book tables (Loo Table 2.1). Cells wrap so a 4-column table fits a phone;
+  // the wrapper scrolls only a table that still cannot fit, never the page.
+  table: ({ children }) => (
+    <div className="my-4 overflow-x-auto">
+      <table className="w-full border-collapse text-sm">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => <th className="border border-border bg-muted px-3 py-2 text-left align-top font-semibold">{children}</th>,
+  td: ({ children }) => <td className="border border-border px-3 py-2 text-left align-top">{children}</td>,
 }
 
 export function MarkdownContent({ markdown }: { markdown: string }) {
   return (
     <div className="max-w-prose text-foreground">
-      <Markdown components={components}>{markdown}</Markdown>
+      <Markdown remarkPlugins={[remarkGfm]} components={components}>{markdown}</Markdown>
     </div>
   )
 }

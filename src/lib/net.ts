@@ -1,5 +1,6 @@
 // Helpers over NetSnapshot (SPEC.md §7.2). Every step gets a fresh copy, so snapshots stay immutable values.
-import type { HighlightKind, NetHighlight, NetLink, NetSnapshot } from '@/types/net'
+import type { HighlightKind, InFlight, NetHighlight, NetLink, NetSnapshot } from '@/types/net'
+import type { Step } from '@/types/step-engine'
 
 export function linkKey(a: string, b: string): string {
   return a < b ? `${a}-${b}` : `${b}-${a}`
@@ -52,4 +53,32 @@ export function plural(n: number, one: string, many = `${one}s`): string {
 /** "S, A, C, D" */
 export function listIds(ids: string[]): string {
   return ids.join(', ')
+}
+
+/** Collects steps over a working copy: each push freezes `work` as it is now into a step snapshot. */
+export function recorder<T extends NetSnapshot>(work: T) {
+  const steps: Step<T>[] = []
+  const push = (
+    description: string,
+    highlightLine: number,
+    highlight?: NetHighlight,
+    packets: InFlight[] = [],
+    variables?: Record<string, string | number>,
+  ) => steps.push({ id: steps.length, description, highlightLine, snapshot: frame(work, highlight, packets), variables })
+  return { steps, push }
+}
+
+/** Whitespace- or comma-separated ids, upper-cased: "a, c" gives ["A", "C"]. */
+export function parseIds(input: unknown): string[] {
+  return String(input ?? '')
+    .trim()
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map((t) => t.toUpperCase())
+}
+
+/** Removes a node and every link that touches it. */
+export function removeNode<T extends NetSnapshot>(snap: T, id: string) {
+  snap.nodes = snap.nodes.filter((n) => n.id !== id)
+  snap.links = snap.links.filter((l) => l.a !== id && l.b !== id)
 }

@@ -1,5 +1,6 @@
 // Seeded node placement for randomize() (SPEC.md §7.2, §10).
 import type { NetLink, NetNode } from '@/types/net'
+import { dist, unitDiskLinked } from './geometry'
 import type { Rng } from './rng'
 
 /** Round to one decimal so positions print cleanly in narration and aria labels. */
@@ -29,4 +30,42 @@ export function isConnected(nodes: NetNode[], links: NetLink[]): boolean {
     }
   }
   return seen.size === alive.length
+}
+
+/** Uniform placement retried until the unit disk links connect every node; null after `tries` misses. */
+export function connectedUnitDisk(
+  rng: Rng,
+  ids: string[],
+  w: number,
+  h: number,
+  range: number,
+  tries = 20,
+): { nodes: NetNode[]; links: NetLink[] } | null {
+  for (let t = 0; t < tries; t++) {
+    const nodes = uniform(rng, ids, w, h)
+    const links: NetLink[] = []
+    for (let i = 0; i < nodes.length; i++)
+      for (let j = i + 1; j < nodes.length; j++)
+        if (unitDiskLinked(dist(nodes[i], nodes[j]), range)) {
+          const [a, b] = [nodes[i].id, nodes[j].id].sort()
+          links.push({ a, b })
+        }
+    if (isConnected(nodes, links)) return { nodes, links }
+  }
+  return null
+}
+
+/** The two nodes farthest apart, first found in node order on a tie. */
+export function farthestPair(nodes: NetNode[]): [NetNode, NetNode] {
+  let best: [NetNode, NetNode] = [nodes[0], nodes[1]]
+  let d = -1
+  for (let i = 0; i < nodes.length; i++)
+    for (let j = i + 1; j < nodes.length; j++) {
+      const e = dist(nodes[i], nodes[j])
+      if (e > d) {
+        d = e
+        best = [nodes[i], nodes[j]]
+      }
+    }
+  return best
 }

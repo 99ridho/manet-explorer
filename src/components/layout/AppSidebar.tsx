@@ -21,7 +21,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="px-4 py-3">
         <p className="text-sm font-medium text-muted-foreground">
-          Integrasi Jaringan Mandiri/Mobile
+          Mobile Ad-Hoc Networks
         </p>
         <div className='gap-y-2'>
           <p className="text-xs text-muted-foreground">Universitas Negeri Jakarta</p>

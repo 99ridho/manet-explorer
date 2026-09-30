@@ -2,7 +2,7 @@
 week: 3
 title: Broadcast, Multicast, and Geographic Routing
 source: references/id/minggu-03.md
-status: draft
+status: reviewed
 books:
   - Misra, Woungang & Misra (2009), Guide to Wireless Ad Hoc Networks, chapters 5, 6, and 7
 ---
@@ -12,7 +12,7 @@ books:
 Course: Integrasi Jaringan Mandiri/Mobile, Universitas Negeri Jakarta
 Lecturer: Muhammad Ridho Kurniawan Pratama, M.T.I.
 
-Translated from the Week 3 slides. Every claim carries the book and page the slide cites. This file is a draft until the lecturer reviews it (SPEC.md Section 11).
+Translated from the Week 3 slides. Every claim carries the book and page the slide cites. Reviewed by the lecturer on 2026-09-29.
 
 ---
 
@@ -28,13 +28,13 @@ After this week, a student can:
 
 ## 2. Real-World Usage
 
-Broadcast is the basis of communication in an ad hoc network, route discovery included (Misra chapter 6). Every RREQ of Week 2 is a broadcast, so the cost of broadcasting is paid on every route discovery.
+Broadcast is the basis of communication in an ad hoc network, route discovery included (Misra chapter 6).
 
 The radio makes broadcast expensive (Misra p. 99). A transmission reaches only the nodes in range, so a message still has to be forwarded (the medium is *semi-broadcast*); one transmission uses bandwidth up to twice the transmission range (the *interference area*); and bandwidth, processing power, and energy are far smaller than on a wired network. As a result, counting retransmissions matters much more here than on a wired network.
 
 Multicast sends one data stream to a group of receivers. The wired protocols (PIM, DVMRP, CBT, MOSPF) were designed for wired networks and do not handle what a MANET brings: no infrastructure, the semi-broadcast medium, radio interference, limited resources, fast topology change, and mobility (Misra pp. 98-99).
 
-Geographic routing uses node positions instead of routing tables. Geocast delivers to every node inside a region, which suits a warning to every node in a district (Misra pp. 175-176), and it is widely used to spread queries in sensor networks.
+Geographic routing uses node positions instead of routing tables. Geocast delivers to every node inside a region, and it is widely used to spread queries in sensor networks (Misra pp. 173-177).
 
 ---
 
@@ -59,7 +59,7 @@ Geographic routing uses node positions instead of routing tables. Geocast delive
 | 3 | From the remaining neighbors, choose the one that covers the most uncovered two-hop nodes |
 | 4 | Repeat from step 2 until every two-hop node is covered |
 
-Example: node A has one-hop neighbors B, D, E and two-hop neighbors C, G, F. C is reachable only through B, so B becomes an MPR. Of the rest, D covers G and F, so D becomes an MPR. Every two-hop node is now covered, so E is not needed, and only B and D forward A's broadcasts. A node is *covered* by A if it receives a message that started at A, directly or through forwarding. OLSR uses this mechanism (Week 2). The weakness of MPR: the selection depends on the source, so a relay has to know who broadcast before it (p. 128).
+Example: node A has one-hop neighbors B, D, E and two-hop neighbors C, G, F. C is reachable only through B, and G only through D, so step 1 makes both B and D MPRs. D also covers F, so every two-hop node is now covered, E is not needed, and only B and D forward A's broadcasts. A node is *covered* by A if it receives a message that started at A, directly or through forwarding. OLSR uses this mechanism (Week 2). The weakness of MPR: the selection depends on the source, so a relay has to know who broadcast before it (p. 128).
 
 **Dominating sets** (Misra 6.2.3, pp. 128-129). A *dominating set* is a set such that every node of the network is in it or neighbors a member. An *intermediate* node has two neighbors that are not neighbors of each other. Under Wu and Li's rules 1 and 2, a node is removed from the set if its neighbors are already covered by another neighbor with a larger ID; using neighbor degree instead of ID makes the set smaller. A node with a unique neighbor is always chosen, as with MPR. The term CDS returns in Week 6 as a topology control model.
 
@@ -104,7 +104,7 @@ Example: node A has one-hop neighbors B, D, E and two-hop neighbors C, G, F. C i
 
 **Localization** (Misra pp. 154-155, Figure 7.1). An *anchor* (also *beacon* or *landmark*) is a node that knows its position. *Lateration* needs distances to three non-collinear anchors for a 2D position and four for 3D. Distance comes from signal strength or time-difference of arrival. With no anchor at all, nodes build a local coordinate system from trigonometric relations among themselves.
 
-**Greedy forwarding** (Misra pp. 157-158, Figure 7.2). S learns its neighbors' positions from periodic beacons and D's position from the packet header. Next-hop criteria include *MFR*, the neighbor with the most progress toward D, which minimizes hop count; *NFP*, the nearest neighbor that still makes progress, which reduces collisions when transmit power is adjustable; and a random choice among neighbors that make progress. A neighbor that does not move toward D is never chosen.
+**Greedy forwarding** (Misra pp. 157-158, Figure 7.2). S learns its neighbors' positions from periodic beacons and D's position from the packet header. Next-hop criteria include *MFR*, the neighbor with the most progress toward D, which minimizes hop count; *NFP*, the nearest neighbor that still makes progress, which reduces collisions when transmit power is adjustable; and a random choice among neighbors that make progress.
 
 | Criterion | Basis | Goal |
 |---|---|---|

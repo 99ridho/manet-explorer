@@ -2,9 +2,20 @@
 import type { TopicModule } from '@/types/step-engine'
 import { multihop } from './multihop'
 import { reactiveRouting } from './reactive-routing'
+import { broadcast } from './broadcast'
+import { geographicRouting } from './geographic-routing'
+import { clustering } from './clustering'
+import { addressAllocation } from './address-allocation'
 
 // Cast: each module is strongly typed internally; the registry erases those params.
-export const topics: TopicModule[] = [multihop as unknown as TopicModule, reactiveRouting as unknown as TopicModule]
+export const topics: TopicModule[] = [
+  multihop as unknown as TopicModule,
+  reactiveRouting as unknown as TopicModule,
+  broadcast as unknown as TopicModule,
+  geographicRouting as unknown as TopicModule,
+  clustering as unknown as TopicModule,
+  addressAllocation as unknown as TopicModule,
+]
 
 export function getTopic(slug: string | undefined): TopicModule | undefined {
   return topics.find((t) => t.slug === slug)

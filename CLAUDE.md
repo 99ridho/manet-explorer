@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Baseline built (2026-09-28): the shell, the network layer, and two topics, `multihop` and `reactive-routing`. `SPEC.md` specifies all eleven topics and three case studies; §15 tracks what is built. Weeks 1 and 2 of `references/en/` are `status: reviewed`; the rest are drafts, and a topic may not be implemented until its reference is `reviewed` (SPEC Sections 11 and 15).
+Baseline built (2026-09-28): the shell, the network layer, and two topics, `multihop` and `reactive-routing`. Weeks 3 and 4 added (2026-09-30): `broadcast`, `geographic-routing`, `clustering`, `address-allocation`. `SPEC.md` specifies all eleven topics and three case studies; §15 tracks what is built. Weeks 1 to 4 of `references/en/` are `status: reviewed`; the rest are drafts, and a topic may not be implemented until its reference is `reviewed` (SPEC Sections 11 and 15).
 
 The sibling project `../dsa-course` is the working template. Its code, configs, tests, and `CLAUDE.md` are the reference implementation for everything SPEC.md says is "as in dsa-course" or "copied from dsa-course".
 
@@ -60,7 +60,7 @@ Single-page, client-only React app, the dsa-course architecture with a network l
 - **Registry**: `src/topics/registry.ts` and `src/case-studies/registry.ts` drive the sidebar, home page, and page lookups.
 - **Pages**: `TopicPage` (Real-World Usage | Core Material | Protocol) and `CaseStudyPage` (Scenario | Reasoning | Quiz), both viewport-locked at `lg`.
 - **Shell**: `VisualizerShell`, `OperationBar`, `CodePanel` (one listing, no tabs), `PlaybackControls`, `LiveFields`, copied from dsa-course.
-- **Network layer**: `NetworkCanvas` (`src/components/visualizer/canvas/`) draws every topic: slide units scaled by `UNIT = 60` with y up, a fixed 280px height, and one spring for nodes and links. A topic's `canvas.tsx` only derives the at-rest highlight (bridges for `multihop`, the current route for `reactive-routing`) and passes the snapshot on. `src/lib/net.ts` holds `frame()` (a step snapshot with highlight and packets), `cloneNet()`, `neighbors()` in node order, `linkKey()`, `plural()`. `src/lib/sim/` holds `rng.ts`, `geometry.ts`, and `placement.ts`; mobility, the packet run, and metrics come with the topics that need them.
+- **Network layer**: `NetworkCanvas` (`src/components/visualizer/canvas/`) draws every topic: slide units scaled by `UNIT = 60` with y up, a fixed 280px height, and one spring for nodes and links. A topic's `canvas.tsx` only derives the at-rest view (bridges for `multihop`, the current route for `reactive-routing`, the source's MPR rings, cluster links, address captions through the `nodeLabels` prop) and passes the snapshot on. `src/lib/net.ts` holds `frame()` (a step snapshot with highlight and packets), `recorder()` (the step `push` every operation uses), `cloneNet()`, `neighbors()` in node order, `linkKey()`, `parseIds()`, `removeNode()`, `plural()`. `src/lib/sim/` holds `rng.ts`, `geometry.ts`, and `placement.ts` (`connectedUnitDisk()` and `farthestPair()` for Randomize); mobility, the packet run, and metrics come with the topics that need them.
 - **Variant listings**: a variant that needs its own listing gets its own operation id scoped with `variants` (`discover-aodv`, `discover-dsr`), because `pseudocode` is keyed by operation id.
 - **Tests**: `src/topics/structure.test.ts` (Protocol spec contract) and `src/topics/pseudocode.test.ts` (listings have no blank lines; every emitted line is inside its listing) run over every registered topic with the inputs in `src/topics/test-inputs.ts`; each topic's `operations.test.ts` pins the SPEC §10 seed results; `e2e/topic-page-layout.spec.ts` is the §12 layout contract.
 
@@ -70,6 +70,10 @@ Single-page, client-only React app, the dsa-course architecture with a network l
 |---|---|
 | `multihop` | Complete: Build links (unit disk or shadowing, seeded), Find bridges (Tarjan, C-D and C, D on the seed), Link ETX (0.8 and 0.5 give 2.5), 11 tests. |
 | `reactive-routing` | Complete: Discover route, Send data, Break link for AODV and DSR on the S, A, B, C, E, D seed (5 RREQ transmissions, route S, A, C, D, then S, B, E, D after C-D breaks), 14 tests. |
+| `broadcast` | Complete: Select MPRs (B and D fixed at line 8, E silent), Broadcast by blind flooding (7 transmissions, 8 duplicates) or MPR relays (3 and 2), Remove link (D-F makes A's set B, D, E), 12 tests. |
+| `geographic-routing` | Complete: Route with greedy and a clockwise perimeter walk with GPSR face change over the Gabriel graph (void at S, path S, A, B, C, E, D), greedy only drops at S, 9 tests. |
+| `clustering` | Complete: Elect (highest ID: heads 9 and 8, gateway 6; lowest ID: heads 2, 3, 4, 5, 6), Node leaves (9 leaving gives two elections), Node joins, 10 tests. |
+| `address-allocation` | Complete: Buddy Join, Leave, Crash (C leaks 4), QDAD Join (3 AREQ tries, seeded), Merge partition (Buddy 2 conflicts, QDAD 1), 12 tests. |
 
 ## Decisions log
 
@@ -80,6 +84,8 @@ Single-page, client-only React app, the dsa-course architecture with a network l
 - **Python-like pseudocode only** (2026-09-28): no language tabs, unlike dsa-course.
 - **No `d3-force`** (2026-09-28): nodes have coordinates from the seed or seeded placement.
 - **Baseline** (2026-09-28): shell copied from dsa-course with the §7.1 and §8 amendments; `CodePanel` has no tabs; `StructurePanel` became `ProtocolPanel`; the shell clears steps when the operation changes (a dsa-course behavior fixed here, since the old steps highlighted lines of the new listing). `public/favicon.svg` is dsa-course's icon as a placeholder until this project gets its own.
+- **Weeks 3 and 4** (2026-09-30): the MPR seed follows the slide's four-step table, so line 8 fixes both B and D (the slide's example picks D greedily; same set). The perimeter walk adds GPSR's face change, because the plain clockwise walk failed on connected random networks. `NetworkCanvas` gained a `nodeLabels` prop for addresses instead of a snapshot field, so §7.2 stays verbatim.
+- **GFM tables** (2026-09-29): `MarkdownContent` adds `remark-gfm` and table styles, because the references quote book tables (Loo Table 2.1 printed as raw pipes without them). The table wrapper scrolls on its own, so the page never overflows at 400px. dsa-course's copy lacks the same plugin.
 
 <!-- antislop:start -->
 ## antislop

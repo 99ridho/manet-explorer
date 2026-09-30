@@ -2,7 +2,7 @@
 week: 4
 title: Self-Organization, Node Cooperation, and Address Allocation
 source: references/id/minggu-04.md
-status: draft
+status: reviewed
 books:
   - Misra, Woungang & Misra (2009), Guide to Wireless Ad Hoc Networks, chapters 2, 3, and 14
 ---
@@ -12,7 +12,7 @@ books:
 Course: Integrasi Jaringan Mandiri/Mobile, Universitas Negeri Jakarta
 Lecturer: Muhammad Ridho Kurniawan Pratama, M.T.I.
 
-Translated from the Week 4 slides. Every claim carries the book and page the slide cites. This file is a draft until the lecturer reviews it (SPEC.md Section 11).
+Translated from the Week 4 slides. Every claim carries the book and page the slide cites. Reviewed by the lecturer on 2026-09-29.
 
 ---
 

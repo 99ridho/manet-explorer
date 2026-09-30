@@ -14,10 +14,11 @@ const SPRING = { type: 'spring', stiffness: 260, damping: 26 } as const
 
 const px = (n: Pick<NetNode, 'x' | 'y'>) => ({ x: n.x * UNIT, y: -n.y * UNIT })
 
-function nodeLabel(snap: NetSnapshot, n: NetNode): string {
+function nodeLabel(snap: NetSnapshot, n: NetNode, note?: string): string {
   const k = neighbors(snap, n.id).length
   const roles = n.roles.length > 0 ? `, roles ${n.roles.join(' and ')}` : ''
-  return `${n.id}, ${k} ${k === 1 ? 'neighbor' : 'neighbors'}${roles}${n.down ? ', out of the network' : ''}`
+  const extra = note ? `, ${note}` : ''
+  return `${n.id}, ${k} ${k === 1 ? 'neighbor' : 'neighbors'}${roles}${extra}${n.down ? ', out of the network' : ''}`
 }
 
 function summary(snap: NetSnapshot): string {
@@ -26,7 +27,13 @@ function summary(snap: NetSnapshot): string {
   return `Network of ${snap.nodes.length} nodes and ${radio} links${path}`
 }
 
-export function NetworkCanvas({ snapshot }: { snapshot: NetSnapshot }) {
+/** A caption under a node: short lines drawn on the canvas, and the same facts in words for its spoken label. */
+export interface NodeCaption {
+  lines: string[]
+  spoken: string
+}
+
+export function NetworkCanvas({ snapshot, nodeLabels }: { snapshot: NetSnapshot; nodeLabels?: Record<string, NodeCaption> }) {
   const [focused, setFocused] = useState<string | null>(null)
   const { nodes, links, packets, highlight } = snapshot
 
@@ -136,7 +143,7 @@ export function NetworkCanvas({ snapshot }: { snapshot: NetSnapshot }) {
               key={n.id}
               role="listitem"
               tabIndex={0}
-              aria-label={nodeLabel(snapshot, n)}
+              aria-label={nodeLabel(snapshot, n, nodeLabels?.[n.id]?.spoken)}
               className="cursor-default outline-none focus-visible:[&>circle:first-of-type]:stroke-[var(--color-ring)]"
               initial={{ x: p.x, y: p.y, opacity: 0 }}
               animate={{ x: p.x, y: p.y, opacity: n.down ? 0.3 : 1 }}
@@ -182,6 +189,21 @@ export function NetworkCanvas({ snapshot }: { snapshot: NetSnapshot }) {
                   {endpoint}
                 </text>
               )}
+              {nodeLabels?.[n.id]?.lines.map((line, i) => (
+                <text
+                  key={i}
+                  y={R + 14 + i * 13}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fontFamily="var(--font-mono)"
+                  fill="var(--color-foreground)"
+                  paintOrder="stroke"
+                  stroke="var(--color-card)"
+                  strokeWidth={4}
+                >
+                  {line}
+                </text>
+              ))}
             </motion.g>
           )
         })}

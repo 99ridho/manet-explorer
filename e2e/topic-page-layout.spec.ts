@@ -203,4 +203,30 @@ test.describe('phone', () => {
     await expect(page.locator(ACTIVE_PANEL)).toContainText('AODV next-hop table')
     expect((await documentScroll(page)).scrollWidth).toBe(400)
   })
+
+  for (const [slug, operation, input] of [
+    ['broadcast', /select mprs/i, 'A'],
+    ['geographic-routing', /route/i, 'S D'],
+    ['clustering', /elect/i, null],
+    ['address-allocation', /merge partition/i, null],
+  ] as const) {
+    test(`${slug}: a seed run fits the width`, async ({ page }) => {
+      await openOperation(page, slug, operation)
+      if (input) await page.getByRole('textbox').fill(input)
+      await page.getByRole('button', { name: 'Go', exact: true }).click()
+      await expect(page.locator('[aria-current="step"]').first()).toBeVisible()
+      await page.getByRole('tab', { name: 'Core Material' }).click()
+      expect((await documentScroll(page)).scrollWidth).toBe(400)
+    })
+  }
+
+  test('Core Material renders the book tables as tables that fit the width', async ({ page }) => {
+    await page.goto('/topic/reactive-routing')
+    await expect(card(page, 'Operation')).toBeVisible()
+    await page.getByRole('tab', { name: 'Core Material' }).click()
+    const table = page.locator(`${ACTIVE_PANEL} table`).first()
+    await expect(table.getByRole('columnheader', { name: 'Proactive' })).toBeVisible()
+    await expect(page.locator(ACTIVE_PANEL)).not.toContainText('|---')
+    expect((await documentScroll(page)).scrollWidth).toBe(400)
+  })
 })

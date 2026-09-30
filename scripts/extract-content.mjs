@@ -6,6 +6,10 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 const topics = [
   ['multihop', 'Week-1-Introduction.md'],
   ['reactive-routing', 'Week-2-Routing.md'],
+  ['broadcast', 'Week-3-Broadcast-Multicast-Geographic.md'],
+  ['geographic-routing', 'Week-3-Broadcast-Multicast-Geographic.md'],
+  ['clustering', 'Week-4-Self-Organization.md'],
+  ['address-allocation', 'Week-4-Self-Organization.md'],
 ]
 
 function frontmatter(md, file) {

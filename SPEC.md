@@ -129,7 +129,7 @@ manet-explorer/
 └── .github/workflows/deploy.yml
 ```
 
-Copied from dsa-course without change: `vite.config.ts` (with its SPA-fallback preview plugin), `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js`, `components.json`, `Dockerfile`, `nginx.conf`, `.dockerignore`, `src/lib/step-engine.ts`, `src/lib/use-followed-view.ts`, `src/lib/predict-step.ts`, `src/components/layout/*`, `src/components/case-study/*`, `src/components/MarkdownContent.tsx`, `src/components/ui/*`, `src/hooks/*`. Copied then changed as this spec says: `src/types/step-engine.ts` (Section 7.1), `CodePanel.tsx` (Section 8), `StructurePanel.tsx` renamed `ProtocolPanel.tsx` (Section 8), `scripts/check-copy.mjs` and `scripts/extract-content.mjs` (Section 11), `.github/workflows/deploy.yml` (image name only, Section 13).
+Copied from dsa-course without change: `vite.config.ts` (with its SPA-fallback preview plugin), `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js`, `components.json`, `Dockerfile`, `nginx.conf`, `.dockerignore`, `src/lib/step-engine.ts`, `src/lib/use-followed-view.ts`, `src/lib/predict-step.ts`, `src/components/layout/*`, `src/components/case-study/*`, `src/components/ui/*`, `src/hooks/*`. Copied then changed as this spec says: `src/types/step-engine.ts` (Section 7.1), `CodePanel.tsx` (Section 8), `StructurePanel.tsx` renamed `ProtocolPanel.tsx` (Section 8), `MarkdownContent.tsx` (adds `remark-gfm` and table styles, because the references quote book tables), `scripts/check-copy.mjs` and `scripts/extract-content.mjs` (Section 11), `.github/workflows/deploy.yml` (image name only, Section 13).
 
 ## 5. Theming
 
@@ -180,7 +180,7 @@ Each operation ships one pseudocode listing, `pseudocode[operationId]`, written 
 - No blank lines inside a listing, so every line is highlightable. `src/topics/pseudocode.test.ts` checks the `def` line, the four-space indents, balanced brackets, and the colon on every block opener.
 - Each topic's `pseudocode.ts` exports `L`, the named line numbers of each listing, and `operations.ts` highlights through it rather than with bare numbers.
 
-The listings in Sections 10.2, 10.4 to 10.11, and 19 still show the earlier prose style. Each is rewritten in this style, and its step table's line column renumbered, when that topic is implemented; the triggers and narration stay as written.
+The listings in Sections 10.2, 10.8 to 10.11, and 19 still show the earlier prose style. Each is rewritten in this style, and its step table's line column renumbered, when that topic is implemented; the triggers and narration stay as written.
 
 `highlightLine` is a 1-indexed line of that listing. There is no line map to maintain.
 
@@ -278,6 +278,7 @@ As in dsa-course Section 8, with these differences.
   - Links are lines. `broken` is dashed; `virtual` is dotted and carries its own label ("tunnel", "toward D"); a link with `quality` shows the value on hover and focus; a link with `bandwidth` always shows it.
   - Nodes are circles labeled with their id. Roles draw as follows: `source` and `dest` get a filled accent ring and the letters S or D beside the node when the id is not already S or D; `mpr`, `head`, and `gateway` get a ring (solid, double, dashed); `malicious` fills the node with `--color-destructive`; `anchor` gets a square.
   - Hovering or focusing a node draws its range circle at `range`. Nodes are focusable with Tab and announce "`{id}`, `{k}` neighbors, roles `{roles}`".
+  - An optional `nodeLabels` prop (a component prop, not a snapshot field) draws a caption of short lines under a node and adds its spoken form to the node's label; Section 10.7 uses it for addresses.
   - `packets` draw as a dot on the link from `from` to `to` (or rings on every link for `"*"`) with the message name as a small label, animated with `motion/react` over 60 % of the step interval.
   - The canvas `aria-label` summarizes the snapshot: "`{n}` nodes, `{m}` links" plus ", path `{path}`" when `highlight.path` is set.
 - **`MetricsBars`**: the Section 9.1 result, drawn inside the canvas card in place of the network on the last step of a metrics run: one group per metric, two bars per group (chosen variant first), each with its value as text. Colors follow the dataviz rule of the theme (`--color-chart-1` for the chosen variant, `--color-chart-3` for the other).
@@ -681,66 +682,82 @@ This is the Week 2 quiz case (link C-D breaks): C and D send the RERR, the route
 
 **Select MPRs** (`select-mpr`, `variants: ["mpr"]`, `inputKind: "text"`, placeholder "Node, e.g. A")
 
-```
-1  def SELECT_MPR(u):
-2    N1 = neighbors(u); N2 = the two-hop neighbors of u, not in N1 and not u
-3    MPR = every n in N1 that is the only way to some node of N2
-4    covered = the N2 nodes that MPR reaches
-5    while covered != N2:
-6      n = the node of N1 not in MPR that covers the most uncovered N2 nodes
-7      MPR.add(n); covered = covered + what n covers
-8    return MPR
+```python
+1  def select_mpr(u):
+2      n1 = set(u.neighbors())
+3      n2 = two_hop(u)  # neighbors of n1, minus n1 and u
+4      mpr = set()
+5      for c in n2:
+6          via = n1 & set(c.neighbors())
+7          if len(via) == 1:
+8              mpr |= via  # the only way to c
+9      covered = n2 & reach(mpr)
+10     while covered != n2:
+11         n = max(n1 - mpr, key=new_cover)  # ties go to node order
+12         mpr.add(n)
+13         covered |= n2 & reach({n})
+14     return mpr
 ```
 
-Ties at line 6 go to the node that comes first in node order.
+`two_hop`, `reach`, and `new_cover` are named for what they return: the two-hop neighbors, the two-hop nodes a set of neighbors reaches, and how many uncovered two-hop nodes a neighbor adds. Ties at line 11 go to the node that comes first in node order.
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
-| Sets | 2 | "`{u}` has one-hop neighbors `{N1}` and two-hop neighbors `{N2}`." | N1 current, N2 visited |
-| Per unique | 3 | "`{c}` is reachable only through `{n}`, so `{n}` becomes an MPR." | `{n}` found |
-| Covered | 4 | "The MPRs so far cover `{covered}`." | covered visited |
-| Per greedy pick | 7 | "`{n}` covers `{k}` of the uncovered two-hop neighbors, the most, so it becomes an MPR." | `{n}` found |
-| Done | 8 | "Every two-hop neighbor is covered. The MPR set of `{u}` is `{MPR}`; `{rest}` stay silent." (or "; every neighbor is needed.") | MPRs found |
+| Invalid input | 1 | "Type a node id, such as A." | none |
+| No neighbors | 3 | "`{u}` has no neighbors, so it needs no MPR." | `{u}` current |
+| Sets | 3 | "`{u}` has one-hop neighbors `{N1}` and two-hop neighbors `{N2}`." (or "…and no two-hop neighbors.", then "`{u}` needs no MPR: every node it can reach is one hop away." at line 14) | N1 current, N2 visited |
+| Per unique | 8 | "`{c}` is reachable only through `{n}`, so `{n}` becomes an MPR." | `{n}` found |
+| Covered | 9 | "The MPRs so far cover `{covered}`." (or "No two-hop neighbor has a single way in, so no MPR is fixed yet.") | covered visited |
+| Per greedy pick | 12 | "`{n}` covers `{k}` of the uncovered two-hop neighbors, the most, so it becomes an MPR." | `{n}` found |
+| Done | 14 | "Every two-hop neighbor is covered. The MPR set of `{u}` is `{MPR}`; `{rest}` stay silent." ("stays" for one; or "; every neighbor is needed.") | MPRs found |
 
-On the seed: B (the only way to C), then D (covers G and F), and E is not needed, the slide's three steps.
+On the seed: C is reachable only through B and G only through D, so line 8 fixes B and D; they cover C, G, and F, no greedy pick follows, and E stays silent. This follows the slide's four-step table; the slide's worked example picks D in its step 2 instead, with the same MPR set (reviewed 2026-09-29, see `anti-slop/audit-003-2026-09-29.md`).
 
-**Broadcast** (`broadcast`, `inputKind: "text"`, placeholder "Source, e.g. A")
+**Broadcast** (`broadcast-flooding` with `variants: ["flooding"]` and `broadcast-mpr` with `variants: ["mpr"]`, one id per listing; `inputKind: "text"`, placeholder "Source, e.g. A")
 
+Blind flooding listing:
+
+```python
+1  def broadcast(src, packet):
+2      queue = deque([(src, None)])
+3      seen = {src}
+4      while queue:
+5          v, heard_from = queue.popleft()
+6          if v != src and not relays(v, heard_from):
+7              continue  # v stays silent
+8          v.broadcast(packet)
+9          for n in v.neighbors():
+10             if n in seen:
+11                 continue  # n drops a duplicate
+12             seen.add(n)
+13             queue.append((n, v))
+14 def relays(v, heard_from):
+15     return True  # blind flooding: every node relays once
 ```
-1  def BROADCAST(src):
-2    queue = [(src, None)]; seen = {src}
-3    while queue:
-4      v, heardFrom = queue.pop(0)
-5      if v == src or RELAYS(v, heardFrom):
-6        v transmits to all its neighbors
-7        for n in neighbors(v):
-8          if n in seen: n drops a duplicate
-9          else: seen.add(n); queue.append((n, v))
-10 def RELAYS(v, heardFrom):
-11   return True                           # blind flooding: every node relays once
-```
 
-The MPR listing reads `11   return v in MPR(heardFrom)            # relay only for the node that chose you`.
+The MPR listing reads `15     return v in heard_from.mpr  # relay only for the node that chose you`. The typed node becomes the source.
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
-| Transmit | 6 | "`{v}` transmits the packet to `{neighbors}`." | `{v}` current, packets `*` |
-| Per neighbor, new | 9 | "`{n}` receives the packet for the first time." | `{n}` new |
-| Per neighbor, duplicate | 8 | "`{n}` already has the packet, so this copy is a duplicate." | `{n}` dropped |
-| Silent (MPR) | 5 | "`{v}` is not an MPR of `{heardFrom}`, so it does not relay." | `{v}` visited |
-| Done | 3 | "`{r}` of `{n}` nodes received the packet with `{t}` transmissions and `{d}` duplicates." | none |
+| Invalid input | 1 | "Type a source node, such as A." | none |
+| Transmit | 8 | "`{v}` transmits the packet to `{neighbors}`." | `{v}` current, packets `*` |
+| Per neighbor, new | 12 | "`{n}` receives the packet for the first time." | `{n}` new, link new |
+| Per neighbor, duplicate | 11 | "`{n}` already has the packet, so this copy is a duplicate." | `{n}` dropped |
+| Silent (MPR) | 7 | "`{v}` is not an MPR of `{heardFrom}`, so it does not relay." | received nodes visited |
+| Done | 4 | "`{r}` of `{n}` other nodes received the packet with `{t}` transmissions and `{d}` duplicates." | none |
 
 Seed results from A: blind flooding 7 transmissions and 8 duplicates; MPR relaying 3 transmissions (A, B, D) and 2 duplicates; both reach all 6 other nodes. The step list shows why the slide says flooding sends redundant copies.
 
 **Remove link** (`remove-link`, `inputKind: "text"`, placeholder "Link, e.g. D F")
 
-```
-1  def REMOVE_LINK(u, v):
-2    delete link u-v
-3    every node recomputes its MPR set from the new HELLO information
+```python
+1  def remove_link(net, u, v):
+2      net.links.remove((u, v))
+3      for w in net.nodes:
+4          w.mpr = select_mpr(w)  # from the new HELLO information
 ```
 
-Steps: "There is no link `{u}`-`{v}`." (line 1); "Link `{u}`-`{v}` is gone." (line 2); per node whose set changed, "`{w}`'s MPR set changes from `{old}` to `{new}`." (line 3). On the seed, removing D-F changes A's set to B, D, E, the Week 3 check question.
+Steps: "Type a link, such as D F." or "There is no link `{u}`-`{v}`." (line 1); "Link `{u}`-`{v}` is gone." (line 2); per node whose set changed, in node order, "`{w}`'s MPR set changes from `{old}` to `{new}`." (line 4), or "No node's MPR set changes." (line 3). On the seed, removing D-F changes A's set to B, D, E, the Week 3 check question, and F's set from D to E.
 
 **Live fields:** `tx`, `dups`, `reached`, `mprs` (size of the source's MPR set).
 
@@ -748,7 +765,7 @@ Steps: "There is no link `{u}`-`{v}`." (line 1); "Link `{u}`-`{v}` is gone." (li
 
 **Variant:** `recovery: "perimeter" | "none"` (default `"perimeter"`), labeled Greedy with perimeter and Greedy only.
 
-**Snapshot:** `NetSnapshot` plus `mode: "greedy" | "perimeter"`, `hops: number`, `voids: number`, and the `virtual` link from the source toward the destination that the slide draws dashed.
+**Snapshot:** `NetSnapshot` plus `mode: "greedy" | "perimeter"`, `hops: number`, `voids: number`, `flow: { src, dst, at } | null` (the last route and the packet's current node), `path: string[]` (the nodes it visited), and the `virtual` link from the source toward the destination that the slide draws dashed, labeled "toward D".
 
 **Seed** (Week 3, "Saat greedy buntu, paket memutari void"; Misra 7.3.2): nodes S (2,2), F (1.2,2.6), A (1.4,1), B (2.2,0.2), C (3.4,0.3), E (4.3,1.1), D (4,2); links S-F, S-A, A-B, B-C, C-E, E-D; S source, D dest; `range = 1.6`.
 
@@ -756,39 +773,44 @@ Steps: "There is no link `{u}`-`{v}`." (line 1); "Link `{u}`-`{v}` is gone." (li
 
 **Route** (`route`, `inputKind: "text"`, placeholder "Source and destination, e.g. S D")
 
-```
-1  def ROUTE(src, dst):
-2    P = GABRIEL(links)                     # planar links for the perimeter walk
-3    v = src; mode = GREEDY
-4    while v != dst:
-5      if mode == GREEDY:
-6        n = the neighbor of v closest to dst
-7        if DIST(n, dst) < DIST(v, dst): v = n
-8        elif PERIMETER_ON: mode = PERIMETER; stuck = v; prev = None
-9        else: drop the packet at v; return
-10     else:
-11       n = NEXT_CLOCKWISE(v, prev, dst, P)   # the void stays on one side
-12       prev = v; v = n
-13       if DIST(v, dst) < DIST(stuck, dst): mode = GREEDY
-14   deliver the packet to dst
+```python
+1  def route(src, dst, recovery):
+2      planar = gabriel(net.links)  # planar links for the perimeter walk
+3      v, mode = src, 'greedy'
+4      while v != dst:
+5          if mode == 'greedy':
+6              n = min(v.neighbors(), key=dist_to(dst))
+7              if dist(n, dst) < dist(v, dst):
+8                  v = n
+9              elif recovery == 'perimeter':
+10                 mode, stuck, prev = 'perimeter', v, None
+11             else:
+12                 return drop(v)  # greedy only: the packet dies at the void
+13         else:
+14             n = next_clockwise(v, prev, dst, planar)  # the void stays on one side
+15             prev, v = v, n
+16             if dist(v, dst) < dist(stuck, dst):
+17                 mode = 'greedy'
+18     deliver(dst)
 ```
 
-The greedy rule forwards to the neighbor closest to the destination and only if that neighbor is closer than the current node, the advance-based rule Week 3 names as loop-free (Misra pp. 158-159). `NEXT_CLOCKWISE` sweeps clockwise around `v`, starting from the direction toward `dst` when `prev` is `None` and from the direction back to `prev` otherwise, and returns the first neighbor over a link of `P`; `prev` itself is returned only when it is the only neighbor. `GABRIEL` keeps link u-v when no other node lies inside the circle whose diameter is u-v (Misra 7.3.2 names RNG or the Gabriel graph); on the seed it keeps every link.
+The greedy rule forwards to the neighbor closest to the destination and only if that neighbor is closer than the current node, the advance-based rule Week 3 names as loop-free (Misra pp. 158-159). `next_clockwise` sweeps clockwise around `v`, starting from the direction toward `dst` when `prev` is `None` and from the direction back to `prev` otherwise, and returns the first neighbor over a link of `planar`; `prev` itself comes last, so the walk turns back only at a dead end. It also applies GPSR's face change: an edge that crosses the line from `stuck` to `dst` nearer `dst` than the last crossing is skipped, and the sweep continues past it. `gabriel` keeps link u-v when no other node lies inside the circle whose diameter is u-v (Misra 7.3.2 names RNG or the Gabriel graph); on the seed it keeps every link. The walk gives up when it is about to repeat its first perimeter edge.
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
-| Planarize | 2 | "The perimeter walk uses the Gabriel graph: `{k}` of `{m}` links stay." (or "every link stays.") | removed links broken |
-| Greedy hop | 7 | "`{n}` is the neighbor closest to `{dst}`: `{dn}` against `{dv}`, so the packet moves to `{n}`." | link tree |
-| Void | 8 | "No neighbor of `{v}` is closer to `{dst}` than `{v}` itself (`{dv}`), so the packet switches to perimeter mode." | `{v}` flagged |
-| Void, greedy only | 9 | "No neighbor of `{v}` is closer to `{dst}` than `{v}` itself, so greedy forwarding drops the packet." | `{v}` dropped |
-| Perimeter hop | 12 | "Sweeping clockwise at `{v}`, the first link leads to `{n}`." | link tree |
-| Back to greedy | 13 | "`{v}` is `{dv}` from `{dst}`, closer than `{stuck}` was, so the packet returns to greedy mode." | `{v}` current |
-| Delivered | 14 | "The packet reaches `{dst}` after `{h}` hops." | path tree |
-| No progress | 11 | "The perimeter walk came back to `{stuck}` without getting closer, so `{dst}` is unreachable." | none |
+| Invalid input | 1 | "Type a source and a destination, such as S D." | none |
+| Planarize | 2 | "The perimeter walk uses the Gabriel graph: `{k}` of `{m}` links stay." (or "every link stays.") | removed links dropped |
+| Greedy hop | 8 | "`{n}` is the neighbor closest to `{dst}`: `{dn}` against `{dv}`, so the packet moves to `{n}`." | link tree |
+| Void | 10 | "No neighbor of `{v}` is closer to `{dst}` than `{v}` itself (`{dv}`), so the packet switches to perimeter mode." | `{v}` flagged |
+| Void, greedy only | 12 | "No neighbor of `{v}` is closer to `{dst}` than `{v}` itself, so greedy forwarding drops the packet." | `{v}` dropped |
+| No progress | 14 | "The perimeter walk came back to `{stuck}` without getting closer, so `{dst}` is unreachable." | `{v}` dropped |
+| Perimeter hop | 15 | "Sweeping clockwise at `{v}`, the first link leads to `{n}`." (after a face change: "Sweeping clockwise at `{v}`, the link to `{x}` crosses the line to `{dst}`, so the walk changes face and takes the link to `{n}`.") | link tree |
+| Back to greedy | 17 | "`{v}` is `{dv}` from `{dst}`, closer than `{stuck}` was, so the packet returns to greedy mode." | `{v}` current |
+| Delivered | 18 | "The packet reaches `{dst}` after `{h}` hops." | `{dst}` found, path tree |
 
-Distances print to two decimals. On the seed: S is 2.00 from D and both its neighbors are farther, so the void step fires at S; the walk goes S, A, B, C; C is 1.80 from D, so greedy resumes; E, then D. The path is S, A, B, C, E, D, the slide's route. The greedy-only variant drops the packet at S.
+Distances print to two decimals, and every step carries `variables.dist`. On the seed: S is 2.00 from D and both its neighbors are farther, so the void step fires at S; the walk goes S, A, B, C; C is 1.80 from D, so greedy resumes; E, then D. The path is S, A, B, C, E, D, the slide's route. The greedy-only variant drops the packet at S. A route between another pair moves the dotted direction line and the source and destination roles to that pair.
 
-**Live fields:** `hops`, `mode`, `voids`, `dist` (current node to destination).
+**Live fields:** `hops`, `mode` (`greedy` or `face`, since `perimeter` does not fit a 14-character chip), `voids`, `dist` (current node to destination).
 
 ### 10.6 Clustering: LCA, `/topic/clustering` (Week 4)
 
@@ -802,56 +824,66 @@ Distances print to two decimals. On the seed: S is 2.00 from D and both its neig
 
 **Elect** (`elect`, `inputKind: "none"`)
 
-```
-1  def ELECT(network):
-2    undecided = every node without a head
-3    while undecided:
-4      v = the undecided node that ranks first among its undecided neighbors and itself
-5      v becomes a cluster head
-6      for n in the undecided neighbors of v: n joins v
-7      remove v and its new members from undecided
-8    for n in the members:
-9      if n neighbors two or more heads: n becomes a gateway
+```python
+1  def elect(net, rank):
+2      undecided = net.nodes_without_head()
+3      while undecided:
+4          v = best_local(undecided, rank)  # ranks first among its undecided neighbors
+5          v.head = v
+6          undecided.discard(v)
+7          for n in v.neighbors():
+8              if n in undecided:
+9                  n.head = v  # n joins the cluster of v
+10                 undecided.discard(n)
+11     for n in net.members():
+12         if len(n.heads_in_range()) >= 2:
+13             n.gateway = True
 ```
 
-"Ranks first" means the highest id, or the lowest under the lowest-ID rule. When several nodes qualify at line 4, the best-ranked of them goes first.
+`best_local` returns the undecided node that ranks first among its undecided neighbors and itself: the highest id, or the lowest under the lowest-ID rule. When several nodes qualify, the best-ranked of them goes first.
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
 | Nothing to do | 2 | "Every node already has a cluster head." | none |
-| Head | 5 | "`{v}` has the `{highest/lowest}` id among its undecided neighbors, so it becomes a cluster head." | `{v}` found |
-| Per member | 6 | "`{n}` joins cluster head `{v}`." | link tree |
-| Per gateway | 9 | "`{n}` neighbors cluster heads `{heads}`, so it becomes a gateway." | `{n}` new |
-| Done | 3 | "`{h}` cluster heads and `{g}` gateways." | none |
+| Head | 5 | "`{v}` has the `{highest/lowest}` id among its undecided neighbors, so it becomes a cluster head." (or "`{v}` has no undecided neighbor left, so it becomes a cluster head of its own.") | `{v}` found |
+| Per member | 9 | "`{n}` joins cluster head `{v}`." | link new |
+| Per gateway | 13 | "`{n}` neighbors cluster heads `{heads}`, so it becomes a gateway." | `{n}` new |
+| Done | 11 | "`{h}` cluster heads and `{g}` gateways." | none |
 
-On the seed with the highest-ID rule: 9 is head (4, 2, 6 join), 8 is head (3, 5 join), 6 is the gateway, the slide's figure. With the lowest-ID rule the same seed gives five heads (2, 3, 4, 5, 6) and gateways 9 and 8; the test pins both.
+Member-to-head links stay drawn as `tree` on every step and at rest. On the seed with the highest-ID rule: 9 is head (4, 2, 6 join), 8 is head (3, 5 join), 6 is the gateway, the slide's figure. With the lowest-ID rule the same seed gives five heads (2, 3, 4, 5, 6) and gateways 9 and 8; the test pins both.
 
 **Node leaves** (`leave`, `inputKind: "text"`, placeholder "Node, e.g. 9")
 
-```
-1  def LEAVE(u):
-2    remove u and its links
-3    if u was a cluster head:
-4      for n in the members of u:
-5        if n neighbors another head: n joins the best-ranked of them
-6        else: n is undecided again
-7      ELECT the undecided nodes                 # lines 3 to 7 of Elect
-8    recompute the gateways
+```python
+1  def leave(net, u, rank):
+2      net.remove(u)
+3      if u.head == u:
+4          for n in u.members():
+5              heads = n.heads_in_range()
+6              if heads:
+7                  n.head = min(heads, key=rank)  # a head it can still hear
+8              else:
+9                  n.head = None  # undecided again
+10         elect(net, rank)  # only the undecided nodes
+11     net.recompute_gateways()
 ```
 
-Steps: "`{u}` leaves the network." (line 2); per orphan, "`{n}` joins cluster head `{h}`, which it can still hear." (line 5) or "`{n}` hears no cluster head, so it is undecided again." (line 6); the Elect head and member rows at line 7, each adding one to `elections`; "Gateways are now `{list}`." (line 8). On the seed, 9 leaving sends 6 to head 8 and makes 4 and 2 heads of their own clusters: two new elections.
+Steps: "Type a node id, such as 9." or "There is no node `{u}`." (line 1); "`{u}` leaves the network." (line 2); per orphan in node order, "`{n}` joins cluster head `{h}`, which it can still hear." (line 7) or "`{n}` hears no cluster head, so it is undecided again." (line 9); the Elect head and member rows at line 10, each head adding one to `elections`; "Gateways are now `{list}`." or "No node is a gateway now." (line 11). On the elected seed, 9 leaving sends 6 to head 8 and makes 4 and 2 heads of their own clusters: two new elections, and no gateway is left.
 
 **Node joins** (`join`, `inputKind: "text"`, placeholder "New id and its neighbors, e.g. 7 6 8")
 
-```
-1  def JOIN(u, neighbors):
-2    add u with links to neighbors
-3    if u neighbors a head: u joins the best-ranked head it hears
-4    else: u becomes a cluster head
-5    recompute the gateways
+```python
+1  def join(net, u, links, rank):
+2      net.add(u, links)
+3      heads = u.heads_in_range()
+4      if heads:
+5          u.head = min(heads, key=rank)
+6      else:
+7          u.head = u  # no head in range, so u leads its own cluster
+8      net.recompute_gateways()
 ```
 
-Steps follow the Leave wording; an id already in use gives "Node `{u}` already exists." at line 1. The new node is placed at the centroid of its neighbors plus (0.3, 0.3).
+Steps: "Type a new id and its neighbors, such as 7 6 8.", "Node `{u}` already exists.", or "There is no node `{x}` to link to." (line 1); "`{u}` joins the network with links to `{list}`." (line 2); "`{u}` joins cluster head `{h}`, which it can hear." (line 5) or "`{u}` hears no cluster head, so it becomes one." (line 7, adding one to `elections`); the gateway row of Leave at line 8. The new node is placed at the centroid of its neighbors plus (0.3, 0.3); on the elected seed, 7 linked to 6 and 8 lands at (2.8, 1.3) and joins head 8.
 
 **Live fields:** `nodes`, `heads`, `gateways`, `elections`.
 
@@ -869,94 +901,111 @@ interface AddressExtra {
   leaked: number;                                  // Buddy: addresses lost with a crashed node
   control: number;                                 // QDAD: AREQ and AREP transmissions
   conflicts: number;                               // duplicate addresses found on merge
-  partition: { nodes: NetNode[]; links: NetLink[]; address: Record<string, number> }; // drawn faded until Merge
-  seed: number;
+  partition: { nodes: NetNode[]; links: NetLink[]; address: Record<string, number>; pool: Record<string, [number, number][]> }; // drawn faded until Merge
+  merged: boolean;
+  seed: number;                                    // QDAD draws from mulberry32(seed); 7 on the seed
 }
 ```
 
 The 16-address space is this demo's choice so every address fits on screen; the Protocol tab says so.
 
-**Seed:** nodes A (0,0), B (1,0), C (2,0); links A-B, B-C. Buddy: A holds 1 to 8 (address 1), B holds 9 to 12 (address 9), C holds 13 to 16 (address 13), the state after A started with the whole space and B joined through A, then C through B. QDAD: A 5, B 11, C 2 (fixed seed values). The separate partition is P (4,0) and Q (5,0) linked P-Q, with addresses P 1, Q 9 under Buddy (their own first node started from the whole space) and P 11, Q 3 under QDAD.
+**Seed:** nodes A (0,0), B (1,0), C (2,0); links A-B, B-C. Buddy: A holds 1 to 8 (address 1), B holds 9 to 12 (address 9), C holds 13 to 16 (address 13), the state after A started with the whole space and B joined through A, then C through B. QDAD: A 5, B 11, C 2 (fixed seed values). The separate partition is P (4,0) and Q (5,0) linked P-Q, with addresses P 1, Q 9 under Buddy (P holds 1 to 8 and Q 9 to 16, since their own first node started from the whole space) and P 11, Q 3 under QDAD.
 
 **Randomize:** replays 3 to 6 random joins from a single first node, same scheme, fresh seed.
 
 **Join, Buddy** (`join-buddy`, `variants: ["buddy"]`, `inputKind: "text"`, placeholder "New node and the node it meets, e.g. D C")
 
+```python
+1  def join_buddy(new, via):
+2      if size(max(via.pool, key=size)) == 1:
+3          return  # no range left to split
+4      lo, hi = max(via.pool, key=size)
+5      keep, give = split_in_half(lo, hi, via.address)  # via keeps the half with its own address
+6      via.pool.replace((lo, hi), keep)
+7      new.pool = [give]
+8      new.address = give[0]  # no other node is asked
 ```
-1  def JOIN(new, via):
-2    if via holds only its own address: return
-3    half = the upper half of via's largest range
-4    via keeps the lower half; new takes half
-5    new.address = the first address of half
-```
+
+`split_in_half` gives `via` the lower half and the newcomer the upper half, except when `via`'s own address sits in the upper half (after a Leave merged ranges), where the halves swap so `via` keeps its address. The new node is placed at `via` plus (0.5, -0.8), moved right in steps of 0.6 while another node sits within 0.4; this placement is this demo's choice.
 
 | Trigger | Line | Description |
 |---|---|---|
 | Invalid | 1 | "Type a new node id and a configured neighbor, such as D C." |
-| No spare address | 2 | "`{via}` holds only its own address, so `{new}` cannot join through it." |
-| Split | 3 | "`{via}` splits `{lo}` to `{hi}` in half." |
-| Hand over | 4 | "`{via}` keeps `{a}` to `{b}` and gives `{c}` to `{d}` to `{new}`." |
-| Address | 5 | "`{new}` takes address `{addr}` without asking any other node." |
+| No spare address | 3 | "`{via}` has no range left to split, so `{new}` cannot join through it." |
+| Split | 4 | "`{via}` splits `{lo}` to `{hi}` in half." |
+| Hand over | 6 | "`{via}` keeps `{a}` to `{b}` and gives `{c}` to `{d}` to `{new}`." (a one-address range prints as the address alone) |
+| Address | 8 | "`{new}` takes address `{addr}` without asking any other node." |
 
-**Leave, Buddy** (`leave-buddy`, `variants: ["buddy"]`, `inputKind: "text"`)
+On the seed, D joining through C: C keeps 13 to 14, and D takes 15.
 
-```
-1  def LEAVE(u):
-2    b = the neighbor of u whose range sits next to u's, else the first neighbor
-3    b takes u's ranges and merges the ones that touch
-4    remove u
-```
+**Leave, Buddy** (`leave-buddy`, `variants: ["buddy"]`, `inputKind: "text"`, placeholder "Node, e.g. C")
 
-Steps: "`{u}` says goodbye and hands `{ranges}` to `{b}`." (line 3), "`{b}` now holds `{merged}`." (line 3), "`{u}` leaves." (line 4).
-
-**Crash, Buddy** (`crash-buddy`, `variants: ["buddy"]`, `inputKind: "text"`)
-
-```
-1  def CRASH(u):
-2    remove u without a goodbye
-3    leaked = leaked + the size of u's ranges    # no node knows they are free
+```python
+1  def leave_buddy(net, u):
+2      b = u.buddy()  # the neighbor whose range sits next to u's, else the first neighbor
+3      b.pool = merge_touching(b.pool + u.pool)
+4      net.remove(u)
 ```
 
-Steps: "`{u}` disappears without a goodbye." (line 2), "`{k}` addresses went with `{u}`, and no node knows they are free." (line 3). Week 4 names this leak and the periodic synchronization that fixes it; v1 shows the leak only.
+Steps: "Type a node id, such as C." (line 1); "`{u}` has no neighbor to take its ranges, so it cannot hand them over." (line 2, and `{u}` stays); "`{u}` says goodbye and hands `{ranges}` to `{b}`." (line 3), "`{b}` now holds `{merged}`." (line 3), "`{u}` leaves." (line 4). On the seed, C leaving hands 13 to 16 to B, which then holds 9 to 16.
 
-**Join, QDAD** (`join-qdad`, `variants: ["qdad"]`, `inputKind: "text"`)
+**Crash, Buddy** (`crash-buddy`, `variants: ["buddy"]`, `inputKind: "text"`, placeholder "Node, e.g. C")
 
-```
-1  def JOIN(new, via):
-2    a = a random address from 1 to 16
-3    tries = 0
-4    while tries < 3:
-5      flood AREQ(a) through the nodes new can reach
-6      if some node that heard it owns a:
-7        that node answers AREP(a); a = another random address; tries = 0
-8      else:
-9        tries = tries + 1
-10   new.address = a                          # 3 AREQs with no AREP, so a counts as free
+```python
+1  def crash_buddy(net, u):
+2      net.remove(u)  # no goodbye
+3      net.leaked += size(u.pool)  # no node knows these addresses are free
 ```
 
-The slide says the AREQ repeats up to a retry limit; 3 is this demo's limit.
+Steps: "`{u}` disappears without a goodbye." (line 2), "`{k}` addresses went with `{u}`, and no node knows they are free." (line 3, its former neighbors flagged). Week 4 names this leak and the periodic synchronization that fixes it; v1 shows the leak only. On the seed, C crashing leaks 4 addresses.
+
+**Join, QDAD** (`join-qdad`, `variants: ["qdad"]`, `inputKind: "text"`, placeholder as Join, Buddy)
+
+```python
+1  def join_qdad(new, via):
+2      a = randint(1, 16)
+3      tries = 0
+4      while tries < 3:
+5          new.flood(AREQ(a))  # through every node new can reach
+6          owner = new.node_using(a)
+7          if owner:
+8              owner.send(AREP(a), to=new)
+9              a = randint(1, 16)
+10             tries = 0
+11         else:
+12             tries += 1  # nobody answered
+13     new.address = a  # three AREQs with no AREP, so a counts as free
+```
+
+The slide says the AREQ repeats up to a retry limit; 3 is this demo's limit. `randint` draws from `mulberry32(seed)`, and the operation stores a fresh `seed` drawn from the same generator, so the next join picks differently.
 
 | Trigger | Line | Description |
 |---|---|---|
+| Invalid | 1 | "Type a new node id and a configured neighbor, such as D C." |
 | Pick | 2 | "`{new}` picks address `{a}` at random." |
 | Per try | 5 | "`{new}` floods AREQ `{a}` (try `{t}` of 3)." |
-| Owner | 7 | "`{owner}` already uses `{a}`, so it answers with an AREP and `{new}` picks again." |
-| Silence | 9 | "Nobody answers try `{t}`." |
-| Take | 10 | "Three AREQs got no answer, so `{new}` takes address `{a}`." |
+| Owner | 8 | "`{owner}` already uses `{a}`, so it answers with an AREP and `{new}` picks again." |
+| Pick again | 9 | "`{new}` picks address `{a}` at random." |
+| Silence | 12 | "Nobody answers try `{t}`." |
+| Take | 13 | "Three AREQs got no answer, so `{new}` takes address `{a}`." |
 
-Every AREQ counts once per node that transmits it, and every AREP once per hop, into `control`.
+Every AREQ counts once per node that transmits it (every node `{new}` can reach, itself included), and every AREP once per hop, into `control`.
 
 **Merge partition** (`merge`, `inputKind: "none"`, both variants)
 
-```
-1  def MERGE():
-2    link C to P; the two partitions become one network
-3    for each address used on both sides:
-4      conflicts = conflicts + 1
-5      the node from the joining partition drops its old ranges and JOINs again through its neighbor
+```python
+1  def merge(net, partition):
+2      net.link(net.nearest(partition), partition.first)  # the partitions come into range
+3      for a in shared_addresses(net, partition):
+4          net.conflicts += 1
+5          x = partition.node_using(a)
+6          x.pool, x.address = [], None  # x gives up its old address
+7          join(x, via=x.first_configured_neighbor())
 ```
 
-Steps: "The partition with `{nodes}` comes into range: C links to P." (line 2); per conflict, "`{x}` and `{y}` both use address `{a}`." (line 4) and the Join steps of the active scheme at line 5; "`{k}` conflicts were found and resolved." or "No address is used twice." (line 3). On the seed Buddy finds 2 conflicts (A and P on 1, B and Q on 9) and QDAD finds 1 (B and P on 11). This matches what Week 4 says about partitions: query-based DAD cannot guarantee a unique address when the delay across a partition has no bound, and MANETconf gives each partition an id so that two nodes can tell when a merge happens (Misra pp. 338-341). The Protocol tab points to MANETconf for that reason.
+Steps: "The partition has already merged." (line 1); "The partition with `{nodes}` comes into range: `{m}` links to `{first}`." (line 2, `{m}` the main-network node nearest the partition's first node, C on the seed); per conflict in address order, "`{y}` and `{x}` both use address `{a}`." (line 4, `{y}` from the main network) and the Join steps of the active scheme at line 7, through `{x}`'s first neighbor in node order that has an address and no pending conflict; "`{k}` conflicts were found and resolved." or "No address is used twice." (line 3). On the seed Buddy finds 2 conflicts (A and P on 1, B and Q on 9): P rejoins through C and takes 15, then Q through P and takes 16. QDAD finds 1 (B and P on 11). This matches what Week 4 says about partitions: query-based DAD cannot guarantee a unique address when the delay across a partition has no bound, and MANETconf gives each partition an id so that two nodes can tell when a merge happens (Misra pp. 338-341). The Protocol tab points to MANETconf for that reason.
+
+The canvas draws each node's address under it (Buddy adds its pool on a second line, "1–8"; the spoken label reads "address 1, pool 1 to 8") through `NetworkCanvas`'s `nodeLabels` prop, and the partition as faded nodes without their link until Merge.
 
 **Live fields:** Buddy `nodes`, `free` (addresses in pools not used as an address), `leaked`, `conflicts`; QDAD `nodes`, `control`, `conflicts`.
 
@@ -1307,10 +1356,10 @@ The tracker for every module. A row reaches **Specified** only when its full Sec
 | `multihop` | 1 | reviewed | Specified, 10.1 | Implemented |
 | `proactive-routing` | 2 | reviewed | Specified, 10.2 | not started |
 | `reactive-routing` | 2 | reviewed | Specified, 10.3 | Implemented |
-| `broadcast` | 3 | draft | Specified, 10.4 | not started |
-| `geographic-routing` | 3 | draft | Specified, 10.5 | not started |
-| `clustering` | 4 | draft | Specified, 10.6 | not started |
-| `address-allocation` | 4 | draft | Specified, 10.7 | not started |
+| `broadcast` | 3 | reviewed | Specified, 10.4 | Implemented |
+| `geographic-routing` | 3 | reviewed | Specified, 10.5 | Implemented |
+| `clustering` | 4 | reviewed | Specified, 10.6 | Implemented |
+| `address-allocation` | 4 | reviewed | Specified, 10.7 | Implemented |
 | `mobility` | 5 | draft | Specified, 10.8 | not started |
 | `evaluation` | 6 | draft | Specified, 10.9 | not started |
 | `qos-routing` | 7 | draft | Specified, 10.10 | not started |
