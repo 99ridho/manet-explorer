@@ -180,9 +180,9 @@ Each operation ships one pseudocode listing, `pseudocode[operationId]`, written 
 - No blank lines inside a listing, so every line is highlightable. `src/topics/pseudocode.test.ts` checks the `def` line, the four-space indents, balanced brackets, and the colon on every block opener.
 - Each topic's `pseudocode.ts` exports `L`, the named line numbers of each listing, and `operations.ts` highlights through it rather than with bare numbers.
 
-The listings in Sections 10.2, 10.8 to 10.11, and 19 still show the earlier prose style. Each is rewritten in this style, and its step table's line column renumbered, when that topic is implemented; the triggers and narration stay as written.
+Every listing in Sections 9.1, 10, and 19 is written in this style. An edit to a listing renumbers its step table in the same change.
 
-`highlightLine` is a 1-indexed line of that listing. There is no line map to maintain.
+`highlightLine` is a 1-indexed line of that listing. There is no per-language line map; `L` names the lines of the one listing.
 
 `case-study.ts` is copied verbatim. `StructureChoice.cost` holds the trade-off the English reference states for the mechanism, with its book and page (for DSDV: "control overhead is high, so DSDV does not suit large networks", Loo p. 28), under the same quoting rule as Section 7.3.
 
@@ -298,14 +298,16 @@ Every `run()` is pure: randomness comes only from `src/lib/sim/rng.ts`, seeded f
 
 A topic or simulator may declare one operation with id `metrics` (`inputKind: "none"` unless its section says otherwise). It compares the variants on the same network and the same seed, so the difference between the bars comes from the design alone.
 
-```
-1  def METRICS(network, seed):
-2    for design in variants:           # chosen design first
-3      rng = RNG(seed)
-4      for flow in FLOWS(network, rng):
-5        result = RUN_FLOW(network, design, flow, rng)
-6        record result
-7    return PDR, mean delay, control overhead per design
+```python
+1  def metrics(net, seed):
+2      results = {}
+3      for design in variants:  # the chosen design first
+4          rng = RNG(seed)
+5          runs = []
+6          for flow in flows(net, rng):
+7              runs.append(run_flow(net, design, flow, rng))
+8          results[design] = summarize(runs)  # PDR, mean delay, control overhead
+9      return results
 ```
 
 `src/lib/sim/run.ts` models time in **ticks**. One tick moves every message in flight across one link. The metrics are:
@@ -322,8 +324,8 @@ Steps: one step per flow per design, then one result step.
 
 | Trigger | Line | Description |
 |---|---|---|
-| Flow done | 5 | "`{design}`: flow `{k}` from `{src}` to `{dst}` delivered `{d}` of `{s}` packets in `{t}` ticks." |
-| Result | 7 | "On seed `{seed}`, `{designA}` delivers `{pdrA}` % and `{designB}` delivers `{pdrB}` %." |
+| Flow done | 7 | "`{design}`: flow `{k}` from `{src}` to `{dst}` delivered `{d}` of `{s}` packets in `{t}` ticks." |
+| Result | 9 | "On seed `{seed}`, `{designA}` delivers `{pdrA}` % and `{designB}` delivers `{pdrB}` %." |
 
 `variables` carries `pdr`, `delay`, and `overhead` for the design being run. `src/lib/sim/metrics.test.ts` pins the result of every declared metrics run on its seed, so a change to the model shows up as a failing number, not a silent drift.
 
@@ -452,19 +454,19 @@ interface DsdvExtra {
 
 **Advertise** (`advertise`, `inputKind: "text"`, placeholder "Node, e.g. M4")
 
-```
-1  def ADVERTISE(u):
-2    rows = u.table if FULL_DUMP else the changed rows of u.table
-3    for n in neighbors(u):
-4      for r in rows:
-5        old = n.table[r.dest]
-6        if old is None or r.seq > old.seq:
-7          n.table[r.dest] = (u, r.metric + 1, r.seq)    # a newer sequence number wins
-8        elif r.seq == old.seq and r.metric + 1 < old.metric:
-9          n.table[r.dest] = (u, r.metric + 1, r.seq)    # same age, fewer hops
-10       else:
-11         keep old
-12   mark u's rows unchanged
+```python
+1  def advertise(u, full_dump):
+2      rows = u.table.rows() if full_dump else u.table.changed_rows()
+3      for n in u.neighbors():
+4          for r in rows:
+5              old = n.table.get(r.dest)
+6              if old is None or r.seq > old.seq:
+7                  n.table[r.dest] = Route(u, r.metric + 1, r.seq)  # a newer sequence number wins
+8              elif r.seq == old.seq and r.metric + 1 < old.metric:
+9                  n.table[r.dest] = Route(u, r.metric + 1, r.seq)  # same sequence, fewer hops
+10             else:
+11                 continue  # n keeps its route
+12     u.table.mark_unchanged()
 ```
 
 | Trigger | Line | Description | Highlight |
@@ -482,19 +484,19 @@ A changed row at the receiver gets `changed = true`, so its next incremental upd
 
 **Move node** (`move`, `inputKind: "text"`, placeholder "Node and new neighbor, e.g. M3 M6")
 
-```
-1  def MOVE(u, near):
-2    place u next to near and recompute the links of u
-3    for v in [u] + the nodes u lost as neighbors:
-4      delete v's routes whose next hop is no longer a neighbor
-5    u.seq = u.seq + 1; mark u's own row changed
-6    for n in the new neighbors of u:
-7      n sends u a full dump                         # u needs the whole table once
-8    queue = [u]
-9    while queue:
-10     v = queue.pop(0)
-11     ADVERTISE(v)                                  # triggered update
-12     queue += the neighbors of v whose table changed, if not queued
+```python
+1  def move(net, u, near, full_dump):
+2      lost, gained = net.place_next_to(u, near)  # the unit disk rule relinks u
+3      for v in [u] + lost:
+4          v.delete_stale_routes()  # the next hop is no longer a neighbor
+5      u.seq += 1  # u's own row is now changed
+6      for n in gained:
+7          n.send(Update(n.table.rows()), to=u)  # u needs the whole table once
+8      queue = deque([u])
+9      while queue:
+10         v = queue.popleft()
+11         advertise(v, full_dump)  # triggered update
+12         queue.extend(changed_neighbors(v, queue))  # tables that changed, not yet queued
 ```
 
 `u` moves to `near`'s position plus (0.8, 0) and its links follow the unit disk rule at `range`. Stale-route removal stands in for the table's install-time column, which the slide says exists to remove stale routes. Line 7 exists because an incremental update carries only changed rows, so without it a node that has just arrived would never learn routes that did not change; the slides do not describe this case, and the Protocol tab marks it as this demo's rule. The course reference does not fix how far a node raises its own sequence number; this demo adds 1, and the Protocol tab says so.
@@ -1035,31 +1037,37 @@ interface MobilityExtra {
 
 **Randomize:** a fresh seed; tick and statistics reset.
 
-**Advance** (`advance`, `inputKind: "key"`, placeholder "Ticks, from 1 to 40")
+**Advance** (`advance-rwp` with `variants: ["rwp"]` and `advance-rpgm` with `variants: ["rpgm"]`, one id per listing; `inputKind: "key"`, placeholder "Ticks, from 1 to 40")
 
 RWP listing:
 
-```
-1  def ADVANCE(ticks):
-2    for t in range(ticks):
-3      for v in nodes:
-4        MOVE(v)
-5      links = UNIT_DISK(nodes, range)
-6      count the links that appeared or broke
-7      update link ages and path availability
-8  def MOVE(v):
-9    if v.pause > 0: v.pause = v.pause - 1
-10   elif v is at its waypoint: v.pause = random 0 to 2; pick a new waypoint and speed
-11   else: step toward the waypoint at v.speed
+```python
+1  def advance(net, ticks):
+2      for t in range(ticks):
+3          for v in net.nodes:
+4              move(v)
+5          net.links = unit_disk(net.nodes, net.range)
+6          net.link_changes += count_changes(net.links)  # links that appeared or broke
+7          net.update_link_ages()  # and path availability
+8  def move(v):
+9      if v.pause > 0:
+10         v.pause -= 1
+11     elif v.at_waypoint():
+12         v.pause = rng.randint(0, 2)
+13         v.waypoint, v.speed = rng.point_in(area), rng.uniform(0.3, 1.0)
+14     else:
+15         v.step_toward(v.waypoint, v.speed)
 ```
 
-The RPGM listing replaces lines 8 to 11:
+The RPGM listing replaces lines 8 to 15:
 
-```
-8  def MOVE(v):
-9    ref = v.group.ref                       # moved one step along the group path each tick
-10   if v is at its waypoint: pick a new waypoint within 1 of ref, and a new speed
-11   else: step toward the waypoint at v.speed
+```python
+8  def move(v):
+9      ref = v.group.ref  # moved one step along the group path each tick
+10     if v.at_waypoint():
+11         v.waypoint, v.speed = rng.point_within(ref, 1), rng.uniform(0.3, 1.0)
+12     else:
+13         v.step_toward(v.waypoint, v.speed)
 ```
 
 | Trigger | Line | Description |
@@ -1072,14 +1080,18 @@ The metrics named in the done step are the protocol-independent ones Week 5 list
 
 **Where nodes spend time** (`density`, `inputKind: "none"`, an algorithm)
 
-```
-1  def DENSITY(history):
-2    for p in history:
-3      count p as centre if it lies in the middle half of both width and height
-4    return the centre share
+```python
+1  def density(history):
+2      if not history:
+3          return None  # advance the nodes first
+4      centre = 0
+5      for p in history:
+6          if in_middle_half(p, area):  # the middle half of both width and height
+7              centre += 1
+8      return centre / len(history)  # the share of time spent in the centre quarter
 ```
 
-Steps: "`{k}` of `{n}` recorded positions fall in the centre quarter of the area." (line 3), then "The centre quarter holds `{s}` % of the time spent, against 25 % for an even spread." (line 4), or "Advance the nodes first: no positions are recorded yet." (line 2). The 25 % is the area share, a computed baseline. Week 5 states that RWP crowds nodes in the middle (Misra p. 241); this operation lets the student check that on a run instead of taking it on trust.
+Steps: "`{k}` of `{n}` recorded positions fall in the centre quarter of the area." (line 7), then "The centre quarter holds `{s}` % of the time spent, against 25 % for an even spread." (line 8), or "Advance the nodes first: no positions are recorded yet." (line 3). The 25 % is the area share, a computed baseline. Week 5 states that RWP crowds nodes in the middle (Misra p. 241); this operation lets the student check that on a run instead of taking it on trust.
 
 **Metrics run** (`metrics`, Section 9.1): both models on the current seed for 30 ticks, four flows between random pairs, each sending one data packet per tick along an AODV-style route that is rediscovered when it breaks.
 
@@ -1095,31 +1107,36 @@ Steps: "`{k}` of `{n}` recorded positions fall in the centre quarter of the area
 
 **Randomize:** 8 to 10 nodes in a 6 × 4 area, linked by the active rule, fresh seed.
 
-**Build links** (`build-links`): Section 10.1's operation and table, with the QUDG rule's extra row: "`{p}` and `{q}` are `{d}` apart, between `{q·range}` and `{range}`, and the draw says `{yes/no}`: `{link/no link}`." at line 5 or 7.
+**Build links** (`build-links`): Section 10.1's operation and table, with the QUDG rule's extra row: "`{p}` and `{q}` are `{d}` apart, between `{q·range}` and `{range}`, and the draw says `{yes/no}`: `{link/no link}`." at line 6 when linked and line 5 when not.
 
 **Connected dominating set** (`cds`, `inputKind: "none"`)
 
-```
-1  def CDS(network):
-2    for v in nodes:                                # Wu's marking process
-3      if v has two neighbors that are not neighbors of each other: mark v
-4    for v in the marked nodes:                     # pruning rule 1
-5      if a marked neighbor u with a larger id covers v and all of v's neighbors:
-6        unmark v
-7    return the marked nodes
+```python
+1  def cds(net):
+2      marked = []
+3      for v in net.nodes:  # Wu's marking process
+4          if has_unlinked_pair(v.neighbors()):  # two neighbors that cannot hear each other
+5              marked.append(v)
+6      kept = set(marked)
+7      for v in marked:  # pruning rule 1
+8          u = larger_cover(v, marked)  # a marked neighbor with a larger id that covers v and its neighbors
+9          if u is None:
+10             continue  # v stays
+11         kept.discard(v)
+12     return kept
 ```
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
-| Per node, marked | 3 | "`{u}` and `{w}` are neighbors of `{v}` but not of each other, so `{v}` is marked." | `{v}` found |
-| Per node, not marked | 3 | "Every two neighbors of `{v}` are neighbors of each other, so `{v}` is not marked." | `{v}` visited |
-| Per marked node, pruned | 6 | "`{u}` has a larger id and covers `{v}` and all its neighbors, so `{v}` is unmarked." | `{v}` dropped |
-| Per marked node, kept | 5 | "No marked neighbor with a larger id covers all of `{v}`'s neighbors, so `{v}` stays." | `{v}` found |
-| Result | 7 | "The connected dominating set is `{cds}`: `{k}` of `{n}` nodes." | set tree |
+| Per node, marked | 5 | "`{u}` and `{w}` are neighbors of `{v}` but not of each other, so `{v}` is marked." | `{v}` found |
+| Per node, not marked | 4 | "Every two neighbors of `{v}` are neighbors of each other, so `{v}` is not marked." | `{v}` visited |
+| Per marked node, pruned | 11 | "`{u}` has a larger id and covers `{v}` and all its neighbors, so `{v}` is unmarked." | `{v}` dropped |
+| Per marked node, kept | 10 | "No marked neighbor with a larger id covers all of `{v}`'s neighbors, so `{v}` stays." | `{v}` found |
+| Result | 12 | "The connected dominating set is `{cds}`: `{k}` of `{n}` nodes." | set tree |
 
-Line 5 compares closed neighborhoods (a node plus its neighbors) and uses the marking from line 3 for every check, so the order of pruning does not matter. The marking process is the three-step algorithm of Week 6 (Loo pp. 45-46); the pruning rule is Week 3's rule 1 of Wu and Li (Misra pp. 128-129). On the seed the marking picks B, C, D, E, F, G; pruning removes B (covered by C) and F (covered by G), leaving C, D, E, G.
+Line 8 compares closed neighborhoods (a node plus its neighbors) and checks against `marked`, the marking from line 5, never against `kept`, so the order of pruning does not matter. The marking process is the three-step algorithm of Week 6 (Loo pp. 45-46); the pruning rule is Week 3's rule 1 of Wu and Li (Misra pp. 128-129). On the seed the marking picks B, C, D, E, F, G; pruning removes B (covered by C) and F (covered by G), leaving C, D, E, G.
 
-**Metrics over seeds** (`metrics`, `inputKind: "key"`, placeholder "Seeds, from 1 to 10"): the Section 9.1 run repeated over seeds 1 to `k`. Each seed places 10 nodes in a 6 × 4 area, links them by each variant's rule, and runs three flows of ten packets on the AODV-style model. Steps: one per seed per variant ("`{graph}`, seed `{s}`: `{pdr}` % delivered."), then the result at line 7 of the Section 9.1 listing: "Over `{k}` seeds, UDG delivers `{m1}` % (standard deviation `{s1}`) and QUDG `{m2}` % (standard deviation `{s2}`)." `MetricsBars` draws each mean with a whisker of one standard deviation. Week 6 asks for spread next to every mean; this operation is where the student sees why.
+**Metrics over seeds** (`metrics`, `inputKind: "key"`, placeholder "Seeds, from 1 to 10"): the Section 9.1 run repeated over seeds 1 to `k`. Each seed places 10 nodes in a 6 × 4 area, links them by each variant's rule, and runs three flows of ten packets on the AODV-style model. Steps: one per seed per variant ("`{graph}`, seed `{s}`: `{pdr}` % delivered."), then the result at line 9 of the Section 9.1 listing: "Over `{k}` seeds, UDG delivers `{m1}` % (standard deviation `{s1}`) and QUDG `{m2}` % (standard deviation `{s2}`)." `MetricsBars` draws each mean with a whisker of one standard deviation. Week 6 asks for spread next to every mean; this operation is where the student sees why.
 
 **Live fields:** `nodes`, `links`, `marked`, `cds`.
 
@@ -1145,48 +1162,59 @@ Batteries: A 100, B 20, C 60, D 80, E 100 units.
 
 **Find path** (`path-hop`, `path-bandwidth`, `path-etx`, `path-energy`, one per variant; `inputKind: "text"`; placeholders "Source and destination, e.g. A E" and, for bandwidth, "Source, destination, Mbps, e.g. A E 3")
 
-Hop count and bandwidth (the bandwidth listing adds line 2; the hop listing reads `2    usable = every link`):
+Hop count and bandwidth, bandwidth listing (the hop listing opens `1  def find_path(net, src, dst):` and reads `2      usable = net.links  # every link counts`, so the two number their lines alike):
 
-```
-1  def FIND_PATH(src, dst, need):
-2    usable = the links with bandwidth >= need
-3    frontier = [src]; prev = {src: None}
-4    while frontier:
-5      v = frontier.pop(0)
-6      if v == dst: return the path through prev
-7      for n in the neighbors of v over usable links:
-8        if n not in prev: prev[n] = v; frontier.append(n)
-9    return None                                   # no path meets the request
+```python
+1  def find_path(net, src, dst, need):
+2      usable = net.links_at_least(need)  # bandwidth in Mbps
+3      frontier, prev = deque([src]), {src: None}
+4      while frontier:
+5          v = frontier.popleft()
+6          if v == dst:
+7              return path_to(dst, prev)
+8          for n in v.neighbors(usable):
+9              if n not in prev:
+10                 prev[n] = v
+11                 frontier.append(n)
+12     return None  # no path meets the request
 ```
 
 ETX:
 
-```
-1  def FIND_PATH(src, dst):
-2    cost = {src: 0}; prev = {src: None}; done = set()
-3    while some node has a cost and is not done:
-4      v = that node with the smallest cost
-5      done.add(v)
-6      if v == dst: return the path through prev
-7      for n in the neighbors of v that are not done:
-8        c = cost[v] + 1 / (w(v, n) * w(n, v))      # the ETX of the link
-9        if n not in cost or c < cost[n]: cost[n] = c; prev[n] = v
-10   return None
+```python
+1  def find_path(net, src, dst):
+2      cost, prev, done = {src: 0}, {src: None}, set()
+3      while set(cost) - done:
+4          v = min(set(cost) - done, key=cost.get)  # ties go to node order
+5          done.add(v)
+6          if v == dst:
+7              return path_to(dst, prev)
+8          for n in v.neighbors():
+9              if n in done:
+10                 continue
+11             c = cost[v] + 1 / (w(v, n) * w(n, v))  # the ETX of the link
+12             if n not in cost or c < cost[n]:
+13                 cost[n], prev[n] = c, v
+14     return None  # dst is unreachable
 ```
 
 Energy (keep the weakest relay as strong as possible):
 
-```
-1  def FIND_PATH(src, dst):
-2    weakest = {src: INF}; prev = {src: None}; done = set()
-3    while some node has a value and is not done:
-4      v = that node with the largest weakest, fewer hops on a tie
-5      done.add(v)
-6      if v == dst: return the path through prev
-7      for n in the neighbors of v that are not done:
-8        b = weakest[v] if n == dst else min(weakest[v], n.battery)
-9        if n not in weakest or b > weakest[n]: weakest[n] = b; prev[n] = v
-10   return None
+```python
+1  def find_path(net, src, dst):
+2      weakest, prev, done = {src: float('inf')}, {src: None}, set()
+3      while set(weakest) - done:
+4          v = max(set(weakest) - done, key=weakest.get)  # fewer hops on a tie
+5          done.add(v)
+6          if v == dst:
+7              return path_to(dst, prev)
+8          for n in v.neighbors():
+9              if n in done:
+10                 continue
+11             b = weakest[v] if n == dst else min(weakest[v], n.battery)
+12             if n not in weakest or b > weakest[n]:
+13                 weakest[n], prev[n] = b, v
+14     return None  # dst is unreachable
 ```
 
 | Trigger | Line (hop, bw / etx, energy) | Description | Highlight |
@@ -1194,25 +1222,30 @@ Energy (keep the weakest relay as strong as possible):
 | Invalid input | 1 / 1 | "Type a source and a destination, such as A E." (bandwidth: "…and a bandwidth in Mbps, such as A E 3.") | none |
 | Per pruned link | 2 / none | "Link `{u}`-`{v}` offers `{b}` Mbps, less than `{need}`, so it is not used." | link broken |
 | Settle | 5 / 5 | "`{v}` is next: `{value}`." (hop: "`{h}` hops from `{src}`"; ETX: "ETX `{c}` from `{src}`"; energy: "the weakest relay on the way has `{b}` units") | `{v}` current |
-| Per neighbor, improved | 8 / 9 | "`{n}` is reached through `{v}`: `{value}`." | link active |
-| Per neighbor, not better | 8 / 9 | "Going through `{v}` does not improve `{n}`." | none |
-| Found | 6 / 6 | "Path `{path}`: `{h}` hops, `{summary}`." (bandwidth: "every link offers at least `{need}` Mbps"; ETX: "total ETX `{c}`"; energy: "weakest relay `{b}` units"; hop: "the fewest hops") | path tree |
-| None | 9 / 10 | "No path from `{src}` to `{dst}` meets the request." | none |
+| Per neighbor, improved | 10 / 13 | "`{n}` is reached through `{v}`: `{value}`." | link active |
+| Per neighbor, not better | 9 / 12 | "Going through `{v}` does not improve `{n}`." | none |
+| Found | 7 / 7 | "Path `{path}`: `{h}` hops, `{summary}`." (bandwidth: "every link offers at least `{need}` Mbps"; ETX: "total ETX `{c}`"; energy: "weakest relay `{b}` units"; hop: "the fewest hops") | path tree |
+| None | 12 / 14 | "No path from `{src}` to `{dst}` meets the request." | none |
+
+A neighbor that is already done (line 10) emits no step.
 
 Seed results from A to E: hop count picks A, D, E (2 hops); bandwidth with 3 Mbps prunes A-D and picks A, B, C, E, the slide's answer; ETX picks A, B, C, E (total 3.70 against 6.78 through D, Week 7's point that more short hops can beat fewer weak ones); energy picks A, D, E (weakest relay D at 80, against B at 20). ETX values print to two decimals.
 
 **Send packets** (`send`, `inputKind: "key"`, placeholder "Packets, from 1 to 50")
 
-```
-1  def SEND(k):
-2    for p in range(k):
-3      if the path has a relay that is down: stop
-4      move packet p along the path
-5      every relay on the path spends 1 unit of battery
-6      if a relay reaches 0: that relay goes down
+```python
+1  def send(net, path, k):
+2      for p in range(1, k + 1):
+3          if has_down_relay(path):
+4              return  # the path is broken; find a new path first
+5          send_along(path, DATA(p))
+6          for r in path[1:-1]:  # the relays, not src or dst
+7              r.battery -= 1
+8              if r.battery == 0:
+9                  r.down = True
 ```
 
-Steps: per packet at line 4 ("Packet `{p}` reaches `{dst}`; relays have `{batteries}` left."), a relay running out at line 6 ("`{r}` runs out of battery after packet `{p}`, so the path breaks."), and a stop at line 3 ("The path is broken. Find a new path first."). Sending 20 packets on the ETX path takes B down at packet 20; on the energy path D still has 60 units. Week 7 separates total energy from network lifetime (Loo p. 203); these two runs show the difference on one network.
+Steps: per packet at line 5 ("Packet `{p}` reaches `{dst}`; relays have `{batteries}` left."), a relay running out at line 9 ("`{r}` runs out of battery after packet `{p}`, so the path breaks."), and a stop at line 4 ("The path is broken. Find a new path first."). Sending 20 packets on the ETX path takes B down at packet 20; on the energy path D still has 60 units. Week 7 separates total energy from network lifetime (Loo p. 203); these two runs show the difference on one network.
 
 **Live fields:** `hops`, `cost` (the variant's summary value), `minBatt` (the weakest relay on the path), `sent`.
 
@@ -1230,61 +1263,74 @@ Discovery is DSR-style (Section 10.3), because Week 8 says the watchdog suits so
 
 **Discover route** (`discover`, `inputKind: "none"`, from S to D)
 
+```python
+1  def discover(net, src, dst):
+2      heard = [(src, [src])]
+3      while heard:
+4          heard = flood_tick(heard)  # each node forwards its first copy and adds itself to the record
+5          for n, record in heard:
+6              if n.black_hole:
+7                  n.send(RREP(record + [dst]), to=src)  # a route n does not have
+8              if n.tunnel_end:
+9                  heard.append((n.far_end, record + [n.far_end]))  # replayed in the same tick
+10             if n == dst:
+11                 send_along(reversed(record), RREP(record))
+12         for route in src.rreps_arrived():
+13             src.routes.append(route)  # every route is kept, in order of arrival
+14     return src.routes[0]  # the first RREP to arrive wins
 ```
-1  def DISCOVER(src, dst):
-2    flood the RREQ one hop per tick; each node forwards the first copy and adds itself to the record
-3    for each node n when it first hears the RREQ:
-4      if n is a black hole: n answers at once with RREP(record + [n, dst])   # a route it does not have
-5      if n is a tunnel end: the other end replays the RREQ in the same tick
-6      if n == dst: dst answers RREP(record) along the record
-7    src uses the first RREP that arrives and keeps the later ones
-```
+
+`heard` holds the nodes that first hear the RREQ in this tick, each with the record that reached it.
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
-| Per tick | 2 | "Tick `{t}`: `{nodes}` hear the RREQ." | new nodes current |
-| Black hole | 4 | "`{n}` answers at once, claiming a route `{route}` it does not have." | `{n}` flagged |
-| Tunnel | 5 | "`{n}` passes the RREQ through the tunnel, and `{m}` replays it next to `{far}`." | tunnel active |
-| Destination | 6 | "`{dst}` receives the record `{record}` and answers." | `{dst}` found |
-| Per RREP arrival | 7 | "An RREP with `{route}` reaches `{src}` at tick `{t}`." | packet |
-| Pick | 7 | "`{src}` uses the first route to arrive: `{route}`." | path tree |
+| Per tick | 4 | "Tick `{t}`: `{nodes}` hear the RREQ." | new nodes current |
+| Black hole | 7 | "`{n}` answers at once, claiming a route `{route}` it does not have." | `{n}` flagged |
+| Tunnel | 9 | "`{n}` passes the RREQ through the tunnel, and `{m}` replays it next to `{far}`." | tunnel active |
+| Destination | 11 | "`{dst}` receives the record `{record}` and answers." | `{dst}` found |
+| Per RREP arrival | 13 | "An RREP with `{route}` reaches `{src}` at tick `{t}`." | packet |
+| Pick | 14 | "`{src}` uses the first route to arrive: `{route}`." | path tree |
 
 Seed results: Black hole, the fake RREP S, M, D arrives first and S uses it; Wormhole, D first hears S, M1, M2, D (3 apparent hops against 4 through A, B, C) and S uses it; No attacker, S uses S, A, B, D.
 
 **Send packets** (`send`, `inputKind: "key"`, placeholder "Packets, from 1 to 20")
 
-```
-1  def SEND(k):
-2    for p in range(k):
-3      for v in route:
-4        if v is a black hole: v drops p; break
-5        forward p to the next node          # through the tunnel if the next link is one
-6      count p as delivered or dropped
+```python
+1  def send(net, route, k):
+2      for p in range(1, k + 1):
+3          delivered = True
+4          for v, nxt in zip(route, route[1:]):
+5              if v.black_hole:
+6                  delivered = False  # v drops p without a trace
+7                  break
+8              v.send(DATA(p), to=nxt)  # through the tunnel if this link is one
+9          net.count(p, delivered)
 ```
 
-Steps per packet: "`{v}` drops packet `{p}` without a trace." (line 4) or "Packet `{p}` reaches `{dst}`." (line 6), with "Packet `{p}` crosses the tunnel from `{m1}` to `{m2}`." (line 5) on the wormhole. Week 8 notes that a tunnel works even when traffic is encrypted, because the attacker relays packets without reading them; the delivered count stays at 100 % while `tunneled` rises, which is the point of the scene.
+Steps per packet: "`{v}` drops packet `{p}` without a trace." (line 6) or "Packet `{p}` reaches `{dst}`." (line 9), with "Packet `{p}` crosses the tunnel from `{m1}` to `{m2}`." (line 8) on the wormhole. Week 8 notes that a tunnel works even when traffic is encrypted, because the attacker relays packets without reading them; the delivered count stays at 100 % while `tunneled` rises, which is the point of the scene.
 
 **Send with watchdog** (`watchdog`, `inputKind: "key"`, placeholder "Packets, from 1 to 20")
 
-```
-1  def SEND_WATCHED(k):
-2    for p in range(k):
-3      for v, nxt in the hops of route:
-4        v keeps a copy of p and listens for nxt to forward it
-5        if nxt forwards p: continue
-6        failures[nxt] = failures[nxt] + 1
-7        if failures[nxt] > 3:                      # the threshold
-8          report nxt to src; the pathrater avoids nxt
-9          route = the best discovered route without nxt
-10       break
+```python
+1  def send_watched(net, src, route, k):
+2      for p in range(1, k + 1):
+3          for v, nxt in zip(route, route[1:]):
+4              v.send(DATA(p), to=nxt)  # v keeps a copy and listens to nxt
+5              if nxt == route[-1] or v.overhears(nxt, p):
+6                  continue  # delivered, or passed on
+7              failures[nxt] += 1
+8              if failures[nxt] > 3:  # the threshold
+9                  src.report(nxt)  # the pathrater avoids nxt from now on
+10                 route = best_route_without(src.routes, nxt)
+11             break  # p is lost at nxt
 ```
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
 | Heard | 5 | "`{v}` hears `{nxt}` forward packet `{p}`." | link tree |
-| Silence | 6 | "`{v}` never hears `{nxt}` forward packet `{p}`: `{f}` failures for `{nxt}`." | `{nxt}` flagged |
-| Report | 8 | "`{nxt}` passed the threshold of 3, so `{v}` reports it to `{src}`." | `{nxt}` flagged |
-| Reroute | 9 | "The pathrater avoids `{nxt}`: `{src}` switches to `{route}`." | path tree |
+| Silence | 7 | "`{v}` never hears `{nxt}` forward packet `{p}`: `{f}` failures for `{nxt}`." | `{nxt}` flagged |
+| Report | 9 | "`{nxt}` passed the threshold of 3, so `{v}` reports it to `{src}`." | `{nxt}` flagged |
+| Reroute | 10 | "The pathrater avoids `{nxt}`: `{src}` switches to `{route}`." | path tree |
 | Delivered | 5 | "Packet `{p}` reaches `{dst}`." | none |
 
 The threshold of 3 is this demo's; Week 8 says only that a count past a threshold is reported. On the black hole seed with 10 packets: packets 1 to 4 are dropped, M is reported after the fourth, and packets 5 to 10 go S, A, B, D. On the wormhole seed every packet is passed on, so the watchdog has no failure to count and flags nobody, while M1 and M2 still control the route. This demo counts a forward into the tunnel as heard and does not model what a watcher could physically overhear. Week 8 lists collaborative attacks among the watchdog's blind spots (Misra pp. 444-445).
@@ -1446,25 +1492,35 @@ Differences from dsa-course:
 
 **Canvas.** The view switch offers Topology (the network with bridges dashed and articulation points ringed, from the Section 10.1 algorithm run once on every state), Broadcast (the network with each radio's transmissions and duplicates counted on it), and Route (the current route drawn as `tree`). Every view uses `NetworkCanvas` at the same height.
 
-**Discover route to base** (`discover`, `inputKind: "text"`, placeholder "Team radio, e.g. T1")
+**Discover route to base** (`discover-flooding` with `variants: ["flooding"]` and `discover-mpr` with `variants: ["mpr"]`, one id per listing; `inputKind: "text"`, placeholder "Team radio, e.g. T1")
 
-```
-1  def DISCOVER(src):
-2    queue = [(src, None)]; seen = {src}
-3    while queue:
-4      v, heardFrom = queue.pop(0)
-5      if v == G: continue                          # the gateway answers; it does not relay
-6      if v != src and not RELAYS(v, heardFrom): continue
-7      v broadcasts the RREQ
-8      for n in neighbors(v):
-9        if n in seen: n drops a duplicate
-10       else: seen.add(n); n.reverse = v; queue.append((n, v))
-11   G sends the RREP back along the reverse pointers
-12 def RELAYS(v, heardFrom):
-13   return v in MPR(heardFrom)          # blind flooding: return True
+MPR listing:
+
+```python
+1  def discover(net, src, gateway):
+2      queue = deque([(src, None)])
+3      seen = {src}
+4      while queue:
+5          v, heard_from = queue.popleft()
+6          if v == gateway:
+7              continue  # the gateway answers; it does not relay
+8          if v != src and not relays(v, heard_from):
+9              continue  # v stays silent
+10         v.broadcast(RREQ(src, gateway))
+11         for n in v.neighbors():
+12             if n in seen:
+13                 continue  # n drops a duplicate
+14             seen.add(n)
+15             n.reverse[src] = v  # the reverse path
+16             queue.append((n, v))
+17     send_along(reverse_path(gateway, src), RREP(gateway))
+18 def relays(v, heard_from):
+19     return v in heard_from.mpr  # relay only for the node that chose you
 ```
 
-Steps use the Section 10.4 Broadcast rows (transmit, first copy with "`{n}` records `{v}` as its way back to `{src}`.", duplicate, silent) at lines 7, 10, 9, and 6, focus `broadcast`; the Section 10.3 AODV RREP rows at line 11, focus `route`; and a first step at line 2 ("`{src}` needs a route to G, so it starts a route discovery.", focus `topology`). An invalid radio gives "Type a team radio: T1, T2, or T3." at line 1.
+The blind flooding listing reads `19     return True  # blind flooding: every node relays once`.
+
+Steps use the Section 10.4 Broadcast rows (transmit, first copy with "`{n}` records `{v}` as its way back to `{src}`.", duplicate, silent) at lines 10, 15, 13, and 9, focus `broadcast`; the Section 10.3 AODV RREP rows at line 17, focus `route`; and a first step at line 2 ("`{src}` needs a route to G, so it starts a route discovery.", focus `topology`). An invalid radio gives "Type a team radio: T1, T2, or T3." at line 1.
 
 Seed results from T1: blind flooding makes 8 transmissions and 15 duplicate receptions; MPR relaying makes 6 transmissions (T1, T2, R1, R2, R4, R5) and 9 duplicates; both find T1, T2, R1, R2, R4, R5, G (6 hops).
 
@@ -1472,20 +1528,24 @@ Seed results from T1: blind flooding makes 8 transmissions and 15 duplicate rece
 
 **Radio walks away** (`walk-away`, `inputKind: "text"`, placeholder "Radio, e.g. R2")
 
-```
-1  def WALK_AWAY(u):
-2    u moves out of range of every radio
-3    if u was on the route: the radios next to u send RERRs and delete the route
-4    if u was an articulation point between the team and G: no route to G exists
+```python
+1  def walk_away(net, u):
+2      net.move_out_of_range(u)
+3      if u in net.route:
+4          for node in rerr_path(u):  # from the radios next to u toward each route end
+5              node.delete_routes_through(u)
+6      if not net.reaches(team, gateway):
+7          return False  # u was an articulation point between the team and G
+8      return True  # another path exists; discover again
 ```
 
 | Trigger | Line | Description | Focus |
 |---|---|---|---|
 | Before | 2 | "`{u}` is about to walk out of range." | topology, `{u}` current |
 | Gone | 2 | "`{u}` is out of range of every radio." | topology |
-| On the route | 3 | the Section 10.3 Break link RERR and delete rows | route |
-| Cut | 4 | "`{u}` was an articulation point: without it the team has no path to G." | topology, `{u}` flagged |
-| Still connected | 4 | "The team can still reach G another way. Run Discover route to base again." | topology |
+| On the route | 4, 5 | the Section 10.3 Break link RERR rows (line 4) and delete rows (line 5), the same lines as in Break link | route |
+| Cut | 7 | "`{u}` was an articulation point: without it the team has no path to G." | topology, `{u}` flagged |
+| Still connected | 8 | "The team can still reach G another way. Run Discover route to base again." | topology |
 
 On the seed, R2 walking away leaves a path through R3; R5 walking away cuts G off. Week 1 names bridges as the reason route discovery so often failed in the Berlin network.
 
@@ -1518,37 +1578,47 @@ On the seed, R2 walking away leaves a path through R3; R5 walking away cuts G of
 
 **Volunteer joins** (`join`, `inputKind: "text"`, placeholder "New id and a nearby volunteer, e.g. 10 7")
 
-```
-1  def JOIN(u, near):
-2    place u next to near and link it by range
-3    for n in the neighbors of u, nearest first:
-4      if n has a spare address: BUDDY_JOIN(u, n); break
-5    if u has no address: u waits and joins no cluster
-6    CLUSTER_JOIN(u)                               # join the best head it hears, or become a head
+```python
+1  def join(net, u, near):
+2      net.place_next_to(u, near)  # linked by range
+3      for n in sorted(u.neighbors(), key=dist_to(u)):  # nearest first
+4          if not has_spare(n):
+5              continue  # u asks the next neighbor
+6          join_buddy(u, via=n)
+7          break
+8      if u.address is None:
+9          return  # u waits and joins no cluster
+10     cluster_join(u)  # the best head it hears, or u leads its own cluster
 ```
 
-Steps lift the Section 10.7 Buddy Join rows at line 4 (focus `addresses`) and the Section 10.6 Join rows at line 6 (focus `clusters`); "`{n}` has no spare address, so `{u}` asks the next neighbor." at line 4; "No neighbor of `{u}` has a spare address, so `{u}` cannot join yet." at line 5. On the seed, a new volunteer next to 1 cannot join through 1, whose range holds only its own address: the uneven use of the address space that Week 4 names as Buddy's weakness (Misra pp. 338-339).
+Steps lift the Section 10.7 Buddy Join rows at line 6 (focus `addresses`) and the Section 10.6 Join rows at line 10 (focus `clusters`); "`{n}` has no spare address, so `{u}` asks the next neighbor." at line 5; "No neighbor of `{u}` has a spare address, so `{u}` cannot join yet." at line 9. On the seed, a new volunteer next to 1 cannot join through 1, whose range holds only its own address: the uneven use of the address space that Week 4 names as Buddy's weakness (Misra pp. 338-339).
 
 **Elect cluster heads** (`elect`, `inputKind: "none"`): the Section 10.6 Elect listing and table over the current links, after clearing every head. Focus `clusters`.
 
 **Advance the day** (`advance`, `inputKind: "key"`, placeholder "Ticks, from 1 to 30")
 
-```
-1  def ADVANCE(ticks):
-2    for t in range(ticks):
-3      move every volunteer                        # RPGM or RWP, by variant
-4      links = UNIT_DISK(volunteers, range)
-5      for v in the members:
-6        if v cannot hear its head:
-7          if v hears another head: v joins the best-ranked one
-8          else: v becomes a head; elections = elections + 1
+```python
+1  def advance(net, ticks):
+2      for t in range(ticks):
+3          move_all(net.nodes)  # RPGM or RWP, by variant
+4          net.links = unit_disk(net.nodes, net.range)
+5          for v in net.members():
+6              if v.head in v.neighbors():
+7                  continue  # v still hears its head
+8              heads = v.heads_in_range()
+9              if heads:
+10                 v.head = min(heads, key=rank)  # the best-ranked head it hears
+11             else:
+12                 v.head = v  # v becomes a head
+13                 net.elections += 1
+14     return net.elections
 ```
 
 | Trigger | Line | Description | Focus |
 |---|---|---|---|
 | Per tick, calm | 4 | "Tick `{t}`: `{m}` links, and every member still hears its head." | movement |
 | Per tick, changes | 5 | "Tick `{t}`: `{k}` volunteers lost their head; `{j}` joined another head and `{e}` became heads." | clusters |
-| Done | 2 | "After `{t}` ticks the camp elected `{e}` new heads." | clusters |
+| Done | 14 | "After `{t}` ticks the camp elected `{e}` new heads." | clusters |
 
 The test pins `elections` after 20 ticks for both variants on the seed and requires the RPGM count to be lower. If a change to `src/lib/sim/mobility.ts` breaks that, the seed may change (and this section with it); the model may not be tuned to force the result.
 
@@ -1581,46 +1651,54 @@ The test pins `elections` after 20 ticks for both variants on the seed and requi
 
 **Find route** (`route`, `inputKind: "none"`)
 
-```
-1  def FIND_ROUTE(src, dst):
-2    flood the RREQ; every RREP that reaches src adds a candidate route
-3    if HOP: route = the candidate with the fewest hops, the first to arrive on a tie
-4    if ETX: route = the candidate with the smallest sum of link ETX
+```python
+1  def find_route(net, src, dst, routing):
+2      candidates = flood_rreq(net, src, dst)  # every route an RREP brought back, in order of arrival
+3      if routing == 'hop':
+4          return min(candidates, key=len)  # the first to arrive wins a tie
+5      return min(candidates, key=etx_sum)  # the smallest sum of link ETX
 ```
 
-Steps lift the Section 10.11 Discover rows (a black hole answers at once once M has joined) at line 2, focus `route`, then per candidate "Candidate `{route}`: `{h}` hops, ETX `{e}`." at line 2 and the pick at line 3 or 4: "`{route}` has the fewest hops, so S uses it." or "`{route}` has the smallest ETX, `{e}`, so S uses it." Without M: hop count picks S, X, D (ETX 8.00); ETX picks S, A, B, C, D (ETX 4.43). With M: both pick S, M, D, because M claims a perfect link.
+Steps lift the Section 10.11 Discover rows (a black hole answers at once once M has joined) at line 2, focus `route`, then per candidate "Candidate `{route}`: `{h}` hops, ETX `{e}`." at line 2 and the pick at line 4 or 5: "`{route}` has the fewest hops, so S uses it." or "`{route}` has the smallest ETX, `{e}`, so S uses it." Without M: hop count picks S, X, D (ETX 8.00); ETX picks S, A, B, C, D (ETX 4.43). With M: both pick S, M, D, because M claims a perfect link.
 
 **Router M joins** (`join-m`, `inputKind: "none"`)
 
-```
-1  def JOIN_M():
-2    M links to S and advertises a route to D
+```python
+1  def join_m(net):
+2      m = net.add('M', links=['S'])
+3      m.advertise(link_to='D', w=1.0)  # a link that does not exist
 ```
 
-Steps: "A new router M appears next to S." (line 1), then "M advertises a link to D that does not exist." (line 2), focus `links`. Running Find route again shows the effect.
+Steps: "A new router M appears next to S." (line 2), then "M advertises a link to D that does not exist." (line 3), focus `links`. Running Find route again shows the effect.
 
 **Deliver packets** (`deliver`, `inputKind: "key"`, placeholder "Packets, from 1 to 30")
 
-```
-1  def DELIVER(k):
-2    for p in range(k):
-3      for v, nxt in the hops of route:
-4        if v is a black hole: v drops p; break
-5        try up to 4 times: the frame reaches nxt and its ACK comes back
-6        if every try failed: drop p at v; break
-7        if WATCHDOG: v checks that nxt forwards p   # Section 10.11 lines 4 to 9
-8      count p as delivered or dropped
+```python
+1  def deliver(net, route, k, watchdog):
+2      for p in range(1, k + 1):
+3          delivered = True
+4          for v, nxt in zip(route, route[1:]):
+5              if v.black_hole:
+6                  delivered = False  # v drops p without a trace
+7                  break
+8              if not v.send_with_retries(DATA(p), to=nxt, tries=4):  # each try needs the frame and its ACK
+9                  delivered = False  # no ACK after 4 tries, so p is lost at v
+10                 break
+11             if watchdog:
+12                 watch(v, nxt, p)  # Section 10.11 Send with watchdog, lines 4 to 10
+13         net.count(p, delivered)
+14     return net.delivered / k
 ```
 
 The per-try success probability is `w(v, nxt) * w(nxt, v)`, drawn from `rng(seed)`. Week 3 gives 4 to 7 retransmissions before a timeout for 802.11 unicast (Misra pp. 139-142); this demo uses 4.
 
 | Trigger | Line | Description | Focus |
 |---|---|---|---|
-| Per packet, delivered | 8 | "Packet `{p}` reaches D after `{tries}` transmissions." | route |
-| Per packet, link failed | 6 | "`{v}` tried 4 times to reach `{nxt}` and got no ACK, so packet `{p}` is lost." | links |
-| Per packet, black hole | 4 | "M drops packet `{p}` without a trace." | route |
-| Watchdog rows | 7 | the Section 10.11 watchdog rows | trust |
-| Done | 2 | "`{d}` of `{k}` packets reached D: `{pdr}` %." | route |
+| Per packet, delivered | 13 | "Packet `{p}` reaches D after `{tries}` transmissions." | route |
+| Per packet, link failed | 9 | "`{v}` tried 4 times to reach `{nxt}` and got no ACK, so packet `{p}` is lost." | links |
+| Per packet, black hole | 6 | "M drops packet `{p}` without a trace." | route |
+| Watchdog rows | 12 | the Section 10.11 watchdog rows | trust |
+| Done | 14 | "`{d}` of `{k}` packets reached D: `{pdr}` %." | route |
 
 Seed results with M joined and 20 packets: the hop mesh delivers none, because every packet goes to M; the ETX mesh with watchdog loses packets 1 to 4 to M, reports M, switches to S, A, B, C, D, and delivers the rest (the test pins the exact count, which depends on the retry draws). Without M, the test also pins both designs' delivery on the seed, where the weak two-hop route loses packets to failed retries.
 
