@@ -6,7 +6,7 @@ import { join, relative } from 'node:path'
 const ROOT = new URL('..', import.meta.url).pathname
 // references/id holds the frozen Indonesian slides (SPEC.md §11); their bytes never change.
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', join('src', 'components', 'ui'), join('references', 'id')])
-const ROOTS = ['src', 'scripts', 'references', 'anti-slop', 'README.md', 'SPEC.md', 'CLAUDE.md', 'index.html']
+const ROOTS = ['src', 'scripts', 'references', 'anti-slop', 'README.md', 'ADR.md', 'SPEC.md', 'CLAUDE.md', 'index.html']
 const EXT = /\.(ts|tsx|mjs|md|html)$/
 
 const CHECKS = [
