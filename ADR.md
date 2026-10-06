@@ -92,3 +92,11 @@ DSDV prints one node's routing table under the network, with a button per node t
 - Status: Accepted
 
 QoS routing labels only what the active metric uses: Mbps for bandwidth, ETX for ETX, batteries under the nodes for energy, batteries on hover otherwise. A label on a horizontal link sits below it, clear of the node circles. Week 8's Randomize restores the variant's seed as §10.11 says, but its button still reads Randomize: `OperationBar` has no per-topic label, and §7.1 forbids extending `TopicModule` for one topic. The tick-by-tick DSR flood lives in `src/lib/dsr-flood.ts` for `routing-attacks` and `community-mesh`. A metrics run with nothing random names its scope instead of a seed ("the slope as it stands"). The relief camp's variant tabs read Teams (RPGM) and Alone (RWP), because the §19.2 labels overflow 400px, and its canvas fits the radios rather than the 12 × 8 area. The community mesh's two predict questions ask about Find route, because §19.3's (after M receives packet 1, after M's fourth failure) need M joined and a route found, and a predict question runs on the fresh seed; the fourth-failure question became a choice question. Live-field chips that would read 14 characters show `n/a` or `0` for nothing.
+
+## ADR-014: Beginner layer
+
+- Date: 2026-10-06
+- Status: Accepted
+
+Students new to networking get a story per topic, a reason on every step, a glossary, and a Start here page (SPEC §20). The stories cast the slide nodes as devices instead of drawing new seeds, so the canvas still matches the lecture figures and no step table or pinned result changes. A why may reason about the mechanism beyond the slides; numbers and book facts still follow §18. `Step.why` and `TopicModule.story` amend §7.1, optional until every topic has them, and a step's reason is set with `why()` after `push()` so the existing push calls keep their shape. Glossary terms open a Radix popover on click, tap, or Enter, because a tooltip does not open on touch. Which block marked a term first is kept in a map keyed by block, because a set filled during render was already full on React's second StrictMode render and marked nothing. Reactive Routing is the pilot; the other weeks follow after review.
+

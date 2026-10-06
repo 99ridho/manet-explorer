@@ -32,6 +32,21 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <NavLink to="/start">
+                  {({ isActive }) => (
+                    <SidebarMenuButton isActive={isActive} className={ITEM}>
+                      <span>Start here</span>
+                    </SidebarMenuButton>
+                  )}
+                </NavLink>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         {topicsByWeek().map((group) => (
           <SidebarGroup key={group.weekLabel}>
             <SidebarGroupLabel>{group.weekLabel}</SidebarGroupLabel>

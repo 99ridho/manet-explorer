@@ -144,6 +144,7 @@ Topic-slug routes are canonical. The week is metadata shown in the sidebar and p
 | Path | Renders |
 |---|---|
 | `/` | `HomePage`: topics grouped by week, then the case studies |
+| `/start` | `StartPage`: the on-ramp for a student new to MANETs, Section 20 |
 | `/topic/multihop` | Multihop links and bridges (Week 1), Section 10.1 |
 | `/topic/proactive-routing` | Proactive routing: DSDV (Week 2), Section 10.2 |
 | `/topic/reactive-routing` | Reactive routing: AODV and DSR (Week 2), Section 10.3 |
@@ -161,7 +162,7 @@ Topic-slug routes are canonical. The week is metadata shown in the sidebar and p
 
 Anything else redirects to `/`.
 
-`TopicPage` follows dsa-course Section 6 exactly: a two-column grid at `lg`, `VisualizerShell` on the left, materials on the right as tabs. The tabs are **Real-World Usage** (default) | **Core Material** | **Protocol**. The first two render `content.realWorldUsage` and `content.coreMaterial` with `MarkdownContent`; Protocol renders `ProtocolPanel` over `structure`. At `lg` the page is locked to the viewport: the document never scrolls, and only the Code listing and the active materials panel do. Below `lg` the columns stack, visualizer first, and the document scrolls. `<TopicView key={slug}>` resets the visualizer, the tab, and the variant mirror on navigation.
+`TopicPage` follows dsa-course Section 6 exactly: a two-column grid at `lg`, `VisualizerShell` on the left, materials on the right as tabs. The tabs are **Scenario** (default, only for a topic with a `story`, Section 20) | **Real-World Usage** (default otherwise) | **Core Material** | **Protocol**. Below `sm` the tab list is a two-column grid, so four tabs fit 400px. The first two render `content.realWorldUsage` and `content.coreMaterial` with `MarkdownContent`; Protocol renders `ProtocolPanel` over `structure`. At `lg` the page is locked to the viewport: the document never scrolls, and only the Code listing and the active materials panel do. Below `lg` the columns stack, visualizer first, and the document scrolls. `<TopicView key={slug}>` resets the visualizer, the tab, and the variant mirror on navigation.
 
 ## 7. Core Domain Types
 
@@ -183,6 +184,8 @@ Each operation ships one pseudocode listing, `pseudocode[operationId]`, written 
 Every listing in Sections 9.1, 10, and 19 is written in this style. An edit to a listing renumbers its step table in the same change.
 
 `highlightLine` is a 1-indexed line of that listing. There is no per-language line map; `L` names the lines of the one listing.
+
+**Amendment (Section 20, ADR-014).** `Step` gains `why?: string`, the reason for the step in plain words, and `TopicModule` gains `story?: TopicStory` (`src/types/story.ts`: `scenario`, Markdown for the Scenario tab, and `cast`, seed node id to the device it plays). `recorder()` in `src/lib/net.ts` returns `why(text)`, which sets the reason on the step pushed last. Both fields are optional until every topic has them (Section 15).
 
 `case-study.ts` is copied verbatim. `StructureChoice.cost` holds the trade-off the English reference states for the mechanism, with its book and page (for DSDV: "control overhead is high, so DSDV does not suit large networks", Loo p. 28), under the same quoting rule as Section 7.3.
 
@@ -281,6 +284,7 @@ As in dsa-course Section 8, with these differences.
   - An optional `nodeLabels` prop (a component prop, not a snapshot field) draws a caption of short lines under a node, or above it when the caption says `place: 'above'`, only while the node is hovered or focused when it says `hover: true`, and always adds its spoken form to the node's label; Section 10.5 uses it for positions and distances, Section 10.7 for addresses.
   - `packets` draw as a dot on the link from `from` to `to` (or rings on every link for `"*"`) with the message name as a small label, animated with `motion/react` over 60 % of the step interval.
   - The canvas `aria-label` summarizes the snapshot: "`{n}` nodes, `{m}` links" plus ", path `{path}`" when `highlight.path` is set.
+- **Beginner layer** (Section 20): `CodePanel` prints the step's `why` under the description as "Why: …" in the same live region, and runs both through `GlossaryText`. `WhosWho` prints the story's cast under the live fields, or after Randomize a line saying the story roles do not apply; it depends on the cast alone, so stepping never changes its height.
 - **`MetricsBars`**: the Section 9.1 result, drawn inside the canvas card in place of the network on the last step of a metrics run: one group per metric, two bars per group (chosen variant first), each with its value as text. Colors follow the dataviz rule of the theme (`--color-chart-1` for the chosen variant, `--color-chart-3` for the other).
 - **`VisualizerShell`** differs from dsa-course in one rule: choosing another operation clears the steps, because the old steps index the old listing.
 - **`HomePage`** cards list a topic's distinct operation labels, since variant-scoped operations share a label.
@@ -1376,6 +1380,7 @@ Additions for this project:
 - A node's range circle appears on focus as well as on hover.
 - `MetricsBars` shows every value as text next to its bar, so the comparison does not depend on reading bar length or color.
 - Colors that tell roles apart (malicious, MPR, head) always come with a second cue: a ring style, a badge letter, or a fill pattern.
+- A glossary term is a native button with a visible focus ring; Enter, Space, a click, or a tap opens its definition, and Escape closes it. `e2e/beginner-layer.spec.ts` checks this, the Scenario tab, the Why line, and the Start here page at 1400px and 400px.
 
 ## 13. Deployment
 
@@ -1415,6 +1420,9 @@ The tracker for every module. A row reaches **Specified** only when its full Sec
 | Case study `sar-slope` | 1–3 | uses Weeks 1–3 | Specified, 19.1 | Implemented |
 | Case study `relief-camp` | 4–6 | uses Weeks 4–6 | Specified, 19.2 | Implemented |
 | Case study `community-mesh` | 7–8 | uses Weeks 7–8 | Specified, 19.3 | Implemented |
+| Beginner layer (Section 20): Start here, glossary | all | uses Week 1 | Specified, 20 | Implemented |
+| Beginner layer: story and why, `reactive-routing` | 2 | reviewed | Specified, 20 | Implemented (pilot) |
+| Beginner layer: story and why, every other topic and case study | 1–8 | reviewed | Specified, 20 | not started |
 | Multicast (ODMRP mesh, MAODV tree) | 3 | draft (§3.2 of Week 3) | Not specified | not started |
 | Node cooperation (CONFIDANT, CORE, OCEAN) | 4 | draft (§3.2 of Week 4) | Not specified | not started |
 
@@ -1459,6 +1467,8 @@ This section is mandatory and not open for negotiation. It is dsa-course Section
 - Student-facing text never points at internal documents. A student does not have `SPEC.md`.
 - No arrows (`→`) or dashes as prose connectors in narration. Use `so` for cause and effect and a colon for a result. The `←/→` glyphs in the keyboard hint are allowed because they name keys.
 - Every sentence names its actor where one exists: a node, a message, the source. No actorless passive, no rhythm tells.
+
+**Why house style** (Section 20). One or two plain sentences, at most 240 characters, ending with a period. A why gives the reason, not a second description: it says what the node is trying to achieve or avoid, in words a student new to networking knows, and it may reason about the mechanism beyond the slides. Any number or book fact in it still follows the number rule above.
 
 **Narration house style.** One plain sentence per step, present tense, naming the node, link, or message it concerns, ending with a period. Two short sentences are fine when a step has a cause and an effect. Counts pluralize. Link names use a hyphen between node ids (`C-D`), which is a name, not a dash. The step tables in Sections 10 and 19 are the canonical examples.
 
@@ -1718,3 +1728,17 @@ Seed results with M joined and 20 packets: the hop mesh delivers none, because e
 | Judge the mesh by what the household gets | Packet delivery ratio, delay, and overhead, `evaluation` (Week 6) | Route length alone |
 
 **Quiz** (6 choice, 2 predict): why fewer hops can mean a slower route (W7); how ETX is computed from the delivery ratios in both directions (W1, W7); what a black hole does (W8); why a gray hole is harder to detect than a black hole (W8); two situations where the watchdog accuses an honest node (W8); what Week 1's Berlin data says about the quality of bridge links (W1); predict: the step after M receives packet 1; predict: the step after M's fourth failure is counted.
+
+## 20. Beginner layer
+
+The course assumes a student who has met networking before. The beginner layer is for one who has not: every topic tells a real-world story over its slide network, every step says why it happens, jargon opens a definition, and a Start here page comes before Week 1. It changes no seed, step description, `highlightLine`, or pinned result of Sections 10 and 19.
+
+**Story** (`story.ts` per topic, `TopicStory`). The Scenario tab renders `story.scenario` with glossary terms marked. It opens with "*Illustrative scenario*", says the slides draw the network as the seed's nodes, and says the slides do not describe the story's setting. It names who each node is, says why the week's mechanism suits the setting (quoting the English reference with its book and page), and ends with a numbered "Try this" list: operations and inputs in run order, each with what to watch. The story keeps the slide labels: `cast` maps seed node ids to devices, and every key is a seed node.
+
+**Why** (`why.ts` per topic, one function per step kind). Every step of every operation sets `why`, under the Section 18 why house style. `src/topics/explain.test.ts` runs every operation of every topic in its `WITH_STORY` list over `test-inputs.ts` and over chains of operations, and fails on a missing, long, or three-sentence why; it also checks the cast and the illustrative label.
+
+**Glossary** (`src/content/glossary.ts`, `src/lib/glossary.ts`, `GlossaryText`). Each entry has a term, its spellings, and a plain definition; a definition that states a book fact cites it. In the narration box, the Why line, and a scenario, the first occurrence of each term per panel or document becomes a button that opens the definition. Acronyms match case-sensitively and words in any case, the longest spelling first, never inside a hyphenated link name. The course references are not marked, because they are quoted verbatim.
+
+**Start here** (`/start`, `StartPage`, first in the sidebar, linked from the home page). It contrasts an infrastructure network with an ad hoc one (Loo 1.2, pp. 4-5), quotes the definition of Loo p. 5, lists the basic glossary terms, and runs a four-phone walkthrough (`src/start/intro.ts`, an unregistered `TopicModule`) in the same `VisualizerShell`: Send a message by fewest hops, and Phone walks away. It ends with how a topic page works and a link to Week 1.
+
+**Rollout.** Reactive Routing is the pilot. The remaining topics and the case studies follow in week order once the lecturer approves the pilot; a case study keeps its own Scenario tab and gains `why` on its steps. When the last one lands, `story` and `why` become required.

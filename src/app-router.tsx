@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { HomePage } from '@/pages/HomePage'
 import { TopicPage } from '@/pages/TopicPage'
 import { CaseStudyPage } from '@/pages/CaseStudyPage'
+import { StartPage } from '@/pages/StartPage'
 
 export const router = createBrowserRouter([
   {
@@ -11,6 +12,7 @@ export const router = createBrowserRouter([
     Component: AppLayout,
     children: [
       { index: true, Component: HomePage },
+      { path: 'start', Component: StartPage },
       { path: 'topic/:slug', Component: TopicPage },
       { path: 'case-study/:slug', Component: CaseStudyPage },
       { path: '*', element: <Navigate to="/" replace /> },

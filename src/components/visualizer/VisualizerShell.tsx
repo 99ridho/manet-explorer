@@ -7,6 +7,7 @@ import { CodePanel } from './CodePanel'
 import { LiveFields } from './LiveFields'
 import { OperationBar } from './OperationBar'
 import { PlaybackControls } from './PlaybackControls'
+import { WhosWho } from './WhosWho'
 import { parseInput } from './input-parsing'
 
 const NO_STEPS: Step<unknown>[] = []
@@ -26,6 +27,7 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
   const [currentOperationId, setCurrentOperationId] = useState<string | null>(null)
   const [inputText, setInputText] = useState('')
   const [inputError, setInputError] = useState<string | null>(null)
+  const [randomized, setRandomized] = useState(false)
 
   const playback = usePlayback(steps)
   // Operations can be scoped to a variant (SPEC §7 `variants`); the first visible one is the default.
@@ -51,11 +53,13 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
   // Randomize and Reset bypass the step engine entirely (§9).
   const handleRandomize = () => {
     setState((s: unknown) => topic.randomize(s, variant))
+    setRandomized(true)
     setSteps(NO_STEPS)
     setInputError(null)
   }
   const handleReset = () => {
     setState(topic.createInitialState(variant))
+    setRandomized(false)
     setSteps(NO_STEPS)
     setInputError(null)
   }
@@ -63,6 +67,7 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
   const handleVariantChange = (value: string) => {
     setVariant(value)
     setState(topic.createInitialState(value))
+    setRandomized(false)
     setSteps(NO_STEPS)
     setCurrentOperationId(null)
     setInputError(null)
@@ -105,6 +110,7 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
         <CardContent>
           <Canvas snapshot={displayedSnapshot} variant={variant} />
           <LiveFields structure={topic.structure} snapshot={displayedSnapshot} variant={variant} />
+          {topic.story && <WhosWho story={topic.story} randomized={randomized} />}
         </CardContent>
       </Card>
 

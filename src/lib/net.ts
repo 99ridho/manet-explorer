@@ -65,7 +65,14 @@ export function recorder<T extends NetSnapshot>(work: T) {
     packets: InFlight[] = [],
     variables?: Record<string, string | number>,
   ) => steps.push({ id: steps.length, description, highlightLine, snapshot: frame(work, highlight, packets), variables })
-  return { steps, push }
+  return { steps, push, why: explainer(steps) }
+}
+
+/** Sets the plain-words reason (SPEC.md §20) on the step pushed last. */
+export function explainer<T>(steps: Step<T>[]) {
+  return (why: string) => {
+    steps[steps.length - 1].why = why
+  }
 }
 
 /** Whitespace- or comma-separated ids, upper-cased: "a, c" gives ["A", "C"]. */

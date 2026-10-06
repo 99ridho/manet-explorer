@@ -4,6 +4,7 @@ import { ReactiveCanvas } from './canvas'
 import { coreMaterial, realWorldUsage } from './content'
 import { randomNetwork, reactiveOperations, seedNetwork } from './operations'
 import { reactivePseudocode } from './pseudocode'
+import { story } from './story'
 import { reactiveStructure } from './structure'
 import type { Protocol, ReactiveSnapshot, ReactiveState } from './types'
 
@@ -29,4 +30,5 @@ export const reactiveRouting: TopicModule<ReactiveState, ReactiveSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asProtocol(variant)),
   randomize: (_state, variant) => randomNetwork(asProtocol(variant), newSeed()),
+  story,
 }

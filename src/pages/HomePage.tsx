@@ -21,6 +21,13 @@ export function HomePage() {
           Each step highlights a line of pseudocode and names the node or message it concerns; scrub back and forth to see
           how routes and tables change.
         </p>
+        <p className="max-w-prose">
+          New to ad hoc networks?{' '}
+          <Link to="/start" className="font-medium text-primary underline underline-offset-4">
+            Read Start here first
+          </Link>
+          : what a MANET is, the words every page uses, and a four-phone example to click through.
+        </p>
         <p className="max-w-prose text-sm text-muted-foreground">
           This is a teaching aid, not a network simulator: the project weeks still use ns-3, OMNeT++, or another simulator.
         </p>

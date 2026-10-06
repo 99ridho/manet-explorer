@@ -45,8 +45,14 @@ function TopicView({ topic }: { topic: TopicModule }) {
         </section>
 
         <section aria-label="Course materials" className="min-w-0 lg:flex lg:min-h-0 lg:flex-col">
-          <Tabs defaultValue="usage" className="lg:min-h-0 lg:flex-1">
-            <TabsList className="w-full">
+          <Tabs defaultValue={topic.story ? 'scenario' : 'usage'} className="lg:min-h-0 lg:flex-1">
+            {/* Four tabs do not fit one row on a phone, so they take two rows there. */}
+            <TabsList className="grid h-auto w-full grid-cols-2 sm:flex">
+              {topic.story && (
+                <TabsTrigger value="scenario" className="flex-1">
+                  Scenario
+                </TabsTrigger>
+              )}
               <TabsTrigger value="usage" className="flex-1">
                 Real-World Usage
               </TabsTrigger>
@@ -57,6 +63,11 @@ function TopicView({ topic }: { topic: TopicModule }) {
                 Protocol
               </TabsTrigger>
             </TabsList>
+            {topic.story && (
+              <TabsContent value="scenario" className="lg:min-h-0 lg:overflow-y-auto lg:pr-2">
+                <MarkdownContent markdown={topic.story.scenario} glossary />
+              </TabsContent>
+            )}
             <TabsContent value="usage" className="lg:min-h-0 lg:overflow-y-auto lg:pr-2">
               <MarkdownContent markdown={topic.content.realWorldUsage} />
             </TabsContent>

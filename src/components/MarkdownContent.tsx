@@ -1,7 +1,10 @@
 // Renders the verbatim course markdown (content.ts) with theme-aware Tailwind classes.
 // No typography plugin so src/index.css stays untouched.
+import { Children, type ReactNode } from 'react'
 import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { GlossaryText } from '@/components/GlossaryText'
+import type { GlossaryClaims } from '@/lib/glossary'
 
 const components: Components = {
   h2: ({ children }) => <h2 className="mt-8 text-xl font-semibold tracking-tight">{children}</h2>,
@@ -33,10 +36,31 @@ const components: Components = {
   td: ({ children }) => <td className="border border-border px-3 py-2 text-left align-top">{children}</td>,
 }
 
-export function MarkdownContent({ markdown }: { markdown: string }) {
+/** Runs the plain-text children of a block through the glossary; elements such as bold pass through. */
+function withGlossary(children: ReactNode, claims: GlossaryClaims, block: number) {
+  return Children.map(children, (child, i) =>
+    typeof child === 'string' ? <GlossaryText text={child} claims={claims} block={`${block}.${i}`} /> : child,
+  )
+}
+
+// SPEC.md §20: hand-written scenarios mark glossary terms; the verbatim course references do not.
+export function MarkdownContent({ markdown, glossary = false }: { markdown: string; glossary?: boolean }) {
+  // One map per render, so each term is marked once in the whole document.
+  const claims: GlossaryClaims = new Map()
+  const marked: Components = glossary
+    ? {
+        ...components,
+        p: ({ children, node }) => (
+          <p className="my-3 leading-relaxed">{withGlossary(children, claims, node?.position?.start.offset ?? 0)}</p>
+        ),
+        li: ({ children, node }) => (
+          <li className="leading-relaxed">{withGlossary(children, claims, node?.position?.start.offset ?? 0)}</li>
+        ),
+      }
+    : components
   return (
     <div className="max-w-prose text-foreground">
-      <Markdown remarkPlugins={[remarkGfm]} components={components}>{markdown}</Markdown>
+      <Markdown remarkPlugins={[remarkGfm]} components={marked}>{markdown}</Markdown>
     </div>
   )
 }

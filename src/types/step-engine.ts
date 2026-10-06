@@ -1,5 +1,6 @@
 // Core domain types: dsa-course SPEC §7 with the SPEC.md §7.1 amendment (no language snippets).
 import type React from 'react'
+import type { TopicStory } from './story'
 
 export interface Step<TSnapshot> {
   id: number
@@ -7,6 +8,7 @@ export interface Step<TSnapshot> {
   highlightLine: number // 1-indexed line number in the operation's pseudocode
   snapshot: TSnapshot // full structure state AFTER this step is applied
   variables?: Record<string, string | number> // e.g. { comparing: "12 vs 7" }
+  why?: string // SPEC.md §20: the reason for this step in plain words, shown under the description
 }
 
 export interface OperationResult<TSnapshot> {
@@ -80,6 +82,7 @@ export interface TopicModule<TState = unknown, TSnapshot = unknown> {
   variant?: VariantConfig
   createInitialState: (variant?: string) => TState
   randomize: (state: TState, variant?: string) => TState // instant, no animation
+  story?: TopicStory // SPEC.md §20: the Scenario tab and the Who's who line
 }
 
 /** Input shapes produced by OperationBar for each `inputKind`. */
