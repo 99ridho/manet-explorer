@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Baseline built (2026-09-28): the shell, the network layer, and two topics, `multihop` and `reactive-routing`. Weeks 3 and 4 added (2026-09-30): `broadcast`, `geographic-routing`, `clustering`, `address-allocation`. `SPEC.md` specifies all eleven topics and three case studies; §15 tracks what is built. Weeks 1 to 4 of `references/en/` are `status: reviewed`; the rest are drafts, and a topic may not be implemented until its reference is `reviewed` (SPEC Sections 11 and 15).
+Baseline built (2026-09-28): the shell, the network layer, and two topics, `multihop` and `reactive-routing`. Weeks 3 and 4 added (2026-09-30): `broadcast`, `geographic-routing`, `clustering`, `address-allocation`. Everything else added (2026-10-06): `proactive-routing`, Weeks 5 to 8 (`mobility`, `evaluation`, `qos-routing`, `routing-attacks`), the simulation layer and metrics run, and the three case studies. All eleven topics and three case studies of `SPEC.md` are built; §15 tracks them. Every file in `references/en/` is `status: reviewed`; a reference that goes back to `draft` blocks its topic again (SPEC Sections 11 and 15).
 
 The sibling project `../dsa-course` is the working template. Its code, configs, tests, and `CLAUDE.md` are the reference implementation for everything SPEC.md says is "as in dsa-course" or "copied from dsa-course".
 
@@ -60,13 +60,15 @@ Single-page, client-only React app, the dsa-course architecture with a network l
 - **Registry**: `src/topics/registry.ts` and `src/case-studies/registry.ts` drive the sidebar, home page, and page lookups.
 - **Pages**: `TopicPage` (Real-World Usage | Core Material | Protocol) and `CaseStudyPage` (Scenario | Reasoning | Quiz), both viewport-locked at `lg`.
 - **Shell**: `VisualizerShell`, `OperationBar`, `CodePanel` (one listing, no tabs), `PlaybackControls`, `LiveFields`, copied from dsa-course.
-- **Network layer**: `NetworkCanvas` (`src/components/visualizer/canvas/`) draws every topic: slide units scaled by `UNIT = 60` with y up, a fixed 280px height, and one spring for nodes and links. A topic's `canvas.tsx` only derives the at-rest view (bridges for `multihop`, the current route for `reactive-routing`, the source's MPR rings, cluster links, address captions and geographic routing's hover and per-step distance captions through the `nodeLabels` prop) and passes the snapshot on. `src/lib/net.ts` holds `frame()` (a step snapshot with highlight and packets), `recorder()` (the step `push` every operation uses), `cloneNet()`, `neighbors()` in node order, `linkKey()`, `parseIds()`, `removeNode()`, `plural()`. `src/lib/sim/` holds `rng.ts`, `geometry.ts`, and `placement.ts` (`connectedUnitDisk()` and `farthestPair()` for Randomize); mobility, the packet run, and metrics come with the topics that need them.
+- **Network layer**: `NetworkCanvas` (`src/components/visualizer/canvas/`) draws every topic: slide units scaled by `UNIT = 60` with y up, a fixed 280px height, and one spring for nodes and links. A topic's `canvas.tsx` only derives the at-rest view (bridges for `multihop`, the current route for `reactive-routing`, the source's MPR rings, cluster links, address captions and geographic routing's hover and per-step distance captions through the `nodeLabels` prop) and passes the snapshot on. `src/lib/net.ts` holds `frame()` (a step snapshot with highlight and packets), `recorder()` (the step `push` every operation uses), `cloneNet()`, `neighbors()` in node order, `linkKey()`, `parseIds()`, `removeNode()`, `plural()`. `src/lib/sim/` holds `rng.ts`, `geometry.ts`, and `placement.ts` (`connectedUnitDisk()` and `farthestPair()` for Randomize). `NetworkCanvas` also takes `trails` and `extent` props for moving nodes.
 - **Variant listings**: a variant that needs its own listing gets its own operation id scoped with `variants` (`discover-aodv`, `discover-dsr`), because `pseudocode` is keyed by operation id.
-- **Tests**: `src/topics/structure.test.ts` (Protocol spec contract) and `src/topics/pseudocode.test.ts` (listings have no blank lines; every emitted line is inside its listing) run over every registered topic with the inputs in `src/topics/test-inputs.ts`; each topic's `operations.test.ts` pins the SPEC §10 seed results; `e2e/topic-page-layout.spec.ts` is the §12 layout contract.
+- **Simulation layer**: `src/lib/sim/mobility.ts` (random waypoint and RPGM, one seeded stream per tick, link statistics), `run.ts` (the §9.1 tick model: an AODV-style flow with discovery, RERR, and a retry 2 ticks after a failed discovery), `metrics.ts` (summaries, the shared `metrics` listing, and `pushMetricsSteps`). A metrics run's result step sets a `metrics` field on the topic's snapshot, and the canvas draws `MetricsBars` while it is set. `src/lib/graph.ts` holds plain bridge and reachability checks; `src/lib/dsr-flood.ts` is the tick-by-tick DSR flood that `routing-attacks` and `community-mesh` share.
+- **Case studies**: `src/case-studies/<slug>/` mirrors dsa-course's file set minus `snippets.ts`; each canvas uses `FocusCaption` and `useFollowedView` over a `focus` field.
+- **Tests**: `src/topics/structure.test.ts` (Protocol spec contract; a live-field chip is at most 13 characters) and `src/topics/pseudocode.test.ts` (listings have no blank lines; every emitted line is inside its listing) run over every registered topic and case-study simulator with the inputs in `src/topics/test-inputs.ts`; each `operations.test.ts` pins the SPEC §10 or §19 seed results; `src/lib/sim/metrics.test.ts` pins every metrics run; `src/case-studies/case-studies.test.ts` is the §19.0 contract; `e2e/topic-page-layout.spec.ts` and `e2e/case-study-page.spec.ts` are the §12 layout contracts.
 
 ## Current status
 
-| Topic | Status |
+| Module | Status |
 |---|---|
 | `multihop` | Complete: Build links (unit disk or shadowing, seeded), Find bridges (Tarjan, C-D and C, D on the seed), Link ETX (0.8 and 0.5 give 2.5), 11 tests. |
 | `reactive-routing` | Complete: Discover route, Send data, Break link for AODV and DSR on the S, A, B, C, E, D seed (5 RREQ transmissions, route S, A, C, D, then S, B, E, D after C-D breaks), 14 tests. |
@@ -74,6 +76,14 @@ Single-page, client-only React app, the dsa-course architecture with a network l
 | `geographic-routing` | Complete: Route with greedy and a clockwise perimeter walk with GPSR face change over the Gabriel graph (void at S, path S, A, B, C, E, D), greedy only drops at S, position and distance captions on hover, and on each step for the deciding node and its neighbors, 14 tests. |
 | `clustering` | Complete: Elect (highest ID: heads 9 and 8, gateway 6; lowest ID: heads 2, 3, 4, 5, 6), Node leaves (9 leaving gives two elections), Node joins, 10 tests. |
 | `address-allocation` | Complete: Buddy Join, Leave, Crash (C leaks 4), QDAD Join (3 AREQ tries, seeded), Merge partition (Buddy 2 conflicts, QDAD 1), 12 tests. |
+| `proactive-routing` | Complete: Advertise and Move node, incremental or full dump; M3 next to M6 gives M2 the row M3 via M4, 3 hops, sequence 194, after 6 advertisements; one node's table under the canvas. |
+| `mobility` | Complete: Advance (RWP, RPGM, seed 5 positions pinned), Where nodes spend time (43.8 % in the centre quarter after 40 RWP ticks), metrics run (RWP 20.0 %, RPGM 40.8 %). |
+| `evaluation` | Complete: Build links (UDG, QUDG with q = 0.8), CDS (C, D, E, G), metrics over seeds with a standard deviation whisker (radius 2, ADR-012). |
+| `qos-routing` | Complete: Find path by hop, bandwidth (A, B, C, E for 3 Mbps), ETX (3.70 against 6.78), energy (A, D, E); Send packets (B down at 20 on the ETX path). |
+| `routing-attacks` | Complete: Discover under a black hole, wormhole, or no attacker; Send packets; watchdog reports M after the fourth failure and switches to S, A, B, D. Randomize restores the seed; its label still reads Randomize. |
+| `sar-slope` | Complete: discovery by MPR relays (6 transmissions, 9 duplicates) or blind flooding (8, 15), Send report, Radio walks away (R5 cuts G off), metrics run, quiz. |
+| `relief-camp` | Complete: Buddy joins over 256 (a newcomer next to 1 joins through 5), Elect (heads 9, 8, 7), Advance (RPGM 0 against RWP 1 new heads in 20 ticks), metrics run, quiz. |
+| `community-mesh` | Complete: Find route (hop S, X, D; ETX S, A, B, C, D; both S, M, D once M joins), Router M joins, Deliver with retries and the watchdog (16 of 20 against 0), metrics run, quiz. |
 
 ## Decisions
 

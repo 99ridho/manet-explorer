@@ -85,3 +85,10 @@ DSDV prints one node's routing table under the network, with a button per node t
 - Status: Accepted
 
 §10.9's Metrics over seeds places 10 nodes in 6 × 4 but names no radius. At the topic's 1.2 most seeds left the flows disconnected under both graph models, so the bars were equal; this demo uses a radius of 2 for that placement, and the Protocol tab says so.
+
+## ADR-013: Weeks 7 and 8 and the case studies
+
+- Date: 2026-10-06
+- Status: Accepted
+
+QoS routing labels only what the active metric uses: Mbps for bandwidth, ETX for ETX, batteries under the nodes for energy, batteries on hover otherwise. A label on a horizontal link sits below it, clear of the node circles. Week 8's Randomize restores the variant's seed as §10.11 says, but its button still reads Randomize: `OperationBar` has no per-topic label, and §7.1 forbids extending `TopicModule` for one topic. The tick-by-tick DSR flood lives in `src/lib/dsr-flood.ts` for `routing-attacks` and `community-mesh`. A metrics run with nothing random names its scope instead of a seed ("the slope as it stands"). The relief camp's variant tabs read Teams (RPGM) and Alone (RWP), because the §19.2 labels overflow 400px, and its canvas fits the radios rather than the 12 × 8 area. The community mesh's two predict questions ask about Find route, because §19.3's (after M receives packet 1, after M's fourth failure) need M joined and a route found, and a predict question runs on the fresh seed; the fourth-failure question became a choice question. Live-field chips that would read 14 characters show `n/a` or `0` for nothing.
