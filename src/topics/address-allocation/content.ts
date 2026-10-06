@@ -1,15 +1,5 @@
-// SPEC.md §11: generated from references/en/Week-4-Self-Organization.md (§2 and the {#address-allocation} subsections of §3).
+// SPEC.md §11: generated from references/en/Week-4-Self-Organization.md (the {#address-allocation} subsections of §3).
 // Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
-
-export const realWorldUsage = `
-*Self-configuring* means the nodes form a connected network on their own; *self-healing* means that structure recovers when a node or link fails (Misra chapter 2). A network that organizes itself has two mechanisms: finding routes between nodes, and updating the topology by detecting node or link failures and optimizing the routes it found (Misra p. 29).
-
-The designer has to accept some conditions (Misra 2.2.2, p. 31): nodes are placed at random, not in a grid or regular pattern; the wireless channel has more errors and collisions than a cable; and batteries, memory, and computing power are limited, so the number of actions a node takes must be small.
-
-Forwarding other nodes' packets drains a node's battery with no direct benefit. In civilian MANETs, selfish behavior is the most common form of non-cooperation (Misra chapter 3). Nodes are assumed rational: they do not always want to break the protocol, but they will not waste their resources voluntarily (pp. 44-45).
-
-Every node needs a unique address before it can take part in routing. DHCP needs a central server, and that server may be out of reach (Misra chapter 14).
-`.trim()
 
 export const coreMaterial = `
 ### 3.3 Unique addresses without DHCP

@@ -1,7 +1,7 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { ReactiveCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { randomNetwork, reactiveOperations, seedNetwork } from './operations'
 import { reactivePseudocode } from './pseudocode'
 import { story } from './story'
@@ -17,7 +17,7 @@ export const reactiveRouting: TopicModule<ReactiveState, ReactiveSnapshot> = {
   operations: reactiveOperations,
   pseudocode: reactivePseudocode,
   CanvasComponent: ReactiveCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: reactiveStructure,
   variant: {
     id: 'protocol',

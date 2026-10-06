@@ -1,8 +1,9 @@
 import type { TopicModule } from '@/types/step-engine'
 import { AttacksCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { attacksOperations, seedNetwork } from './operations'
 import { attacksPseudocode } from './pseudocode'
+import { story } from './story'
 import { attacksStructure } from './structure'
 import type { AttackSnapshot, AttackState, Attacker } from './types'
 
@@ -15,7 +16,7 @@ export const routingAttacks: TopicModule<AttackState, AttackSnapshot> = {
   operations: attacksOperations,
   pseudocode: attacksPseudocode,
   CanvasComponent: AttacksCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: attacksStructure,
   variant: {
     id: 'attacker',
@@ -30,4 +31,5 @@ export const routingAttacks: TopicModule<AttackState, AttackSnapshot> = {
   createInitialState: (variant) => seedNetwork(asAttacker(variant)),
   // SPEC §10.11: no random scene; the button restores the variant's seed.
   randomize: (_state, variant) => seedNetwork(asAttacker(variant)),
+  story,
 }

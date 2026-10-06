@@ -1,15 +1,5 @@
-// SPEC.md §11: generated from references/en/Week-7-QoS-Congestion-Energy.md (§2 and the {#qos-routing} subsections of §3).
+// SPEC.md §11: generated from references/en/Week-7-QoS-Congestion-Energy.md (the {#qos-routing} subsections of §3).
 // Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
-
-export const realWorldUsage = `
-QoS means a network promises a certain level of service. In a MANET, almost everything that promise rests on keeps changing (Misra chapter 12).
-
-Some limits are concrete (Misra chapter 13, p. 311; chapter 4, p. 87). For telephony, the upper bound on one-way delay is 400 ms, within a range of 25 to 400 ms that depends on the voice quality wanted and on echo cancellation. For highly interactive applications such as IP telephony, an end-to-end delay below 150 ms is not noticed by the listener (Misra pp. 283-284). Network activity takes about 10 % of a laptop's power and up to 50 % on a handheld device, from a 1998 experiment by Kravets and Krishnan; devices differ now, but networking still takes a large share of a small device's energy.
-
-On a wired network a lost packet almost always means a full queue. On a wireless multihop network it often does not, and TCP pays for the confusion (Misra chapter 15).
-
-Without infrastructure, energy directly limits network performance (Loo chapter 8).
-`.trim()
 
 export const coreMaterial = `
 ### 3.1 Promising service without guarantees

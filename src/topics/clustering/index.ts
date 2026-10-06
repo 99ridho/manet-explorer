@@ -1,9 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { ClusterCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { clusterOperations, randomNetwork, seedNetwork } from './operations'
 import { clusterPseudocode } from './pseudocode'
+import { story } from './story'
 import { clusterStructure } from './structure'
 import type { ClusterSnapshot, ClusterState, Rule } from './types'
 
@@ -16,7 +17,7 @@ export const clustering: TopicModule<ClusterState, ClusterSnapshot> = {
   operations: clusterOperations,
   pseudocode: clusterPseudocode,
   CanvasComponent: ClusterCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: clusterStructure,
   variant: {
     id: 'rule',
@@ -29,4 +30,5 @@ export const clustering: TopicModule<ClusterState, ClusterSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asRule(variant)),
   randomize: (_state, variant) => randomNetwork(asRule(variant), newSeed()),
+  story,
 }

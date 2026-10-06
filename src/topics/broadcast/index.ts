@@ -1,9 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { BroadcastCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { broadcastOperations, randomNetwork, seedNetwork } from './operations'
 import { broadcastPseudocode } from './pseudocode'
+import { story } from './story'
 import { broadcastStructure } from './structure'
 import type { BroadcastSnapshot, BroadcastState, Relay } from './types'
 
@@ -16,7 +17,7 @@ export const broadcast: TopicModule<BroadcastState, BroadcastSnapshot> = {
   operations: broadcastOperations,
   pseudocode: broadcastPseudocode,
   CanvasComponent: BroadcastCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: broadcastStructure,
   variant: {
     id: 'relay',
@@ -29,4 +30,5 @@ export const broadcast: TopicModule<BroadcastState, BroadcastSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asRelay(variant)),
   randomize: (_state, variant) => randomNetwork(asRelay(variant), newSeed()),
+  story,
 }

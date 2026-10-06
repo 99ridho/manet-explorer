@@ -6,9 +6,11 @@ import { mulberry32, randInt } from '@/lib/sim/rng'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { DsdvRow, DsdvSnapshot, DsdvState, Update } from './types'
+import { WHY } from './why'
 
 type Result = OperationResult<DsdvSnapshot>
 type Push = ReturnType<typeof recorder<DsdvSnapshot>>['push']
+type Why = ReturnType<typeof recorder<DsdvSnapshot>>['why']
 
 /** Shortest-hop tables for every node, each row carrying the destination's own sequence number. */
 export function convergedTables(s: Pick<DsdvSnapshot, 'nodes' | 'links' | 'seqOf'>): Record<string, DsdvRow[]> {
@@ -81,7 +83,7 @@ function setRow(s: DsdvSnapshot, node: string, row: DsdvRow) {
  * One advertisement from `u`, narrated at `line` (or at the Advertise lines when null).
  * Returns the neighbors whose tables changed, in node order.
  */
-function advertise(work: DsdvSnapshot, push: Push, u: string, line: number | null): string[] {
+function advertise(work: DsdvSnapshot, push: Push, why: Why, u: string, line: number | null): string[] {
   const A = L.advertise
   const at = (l: number) => line ?? l
   const full = work.update === 'full'
@@ -90,6 +92,7 @@ function advertise(work: DsdvSnapshot, push: Push, u: string, line: number | nul
   work.shown = u
   if (rows.length === 0) {
     push(`${u} has no changed rows, so the incremental update is empty.`, at(A.send), { nodes: { [u]: 'current' } })
+    why(WHY.empty(u))
     return []
   }
   work.updates += 1
@@ -102,15 +105,17 @@ function advertise(work: DsdvSnapshot, push: Push, u: string, line: number | nul
     { nodes: { [u]: 'current' } },
     [{ kind: 'UPDATE', from: u, to: '*', label: plural(rows.length, 'row') }],
   )
-  const changed = receive(work, push, u, nbrs, rows, line)
+  why(full ? WHY.sendFull(u) : WHY.sendChanged(u))
+  const changed = receive(work, push, why, u, nbrs, rows, line)
   for (const r of work.tables[u]) r.changed = false
   work.shown = u
   push(`${u} sent ${plural(rows.length, 'row')} to ${plural(nbrs.length, 'neighbor')}.`, at(A.done))
+  why(WHY.sent(u))
   return changed
 }
 
 /** Lines 4 to 11: every receiver weighs every row. Returns the receivers whose tables changed. */
-function receive(work: DsdvSnapshot, push: Push, u: string, receivers: string[], rows: DsdvRow[], line: number | null): string[] {
+function receive(work: DsdvSnapshot, push: Push, why: Why, u: string, receivers: string[], rows: DsdvRow[], line: number | null): string[] {
   const A = L.advertise
   const at = (l: number) => line ?? l
   const changed: string[] = []
@@ -124,9 +129,11 @@ function receive(work: DsdvSnapshot, push: Push, u: string, receivers: string[],
       if (!old) {
         setRow(work, n, route)
         push(`${n} had no route to ${r.dest}, so it adds one via ${u}: ${plural(m, 'hop')}.`, at(A.newer), mark)
+        why(WHY.added(n, u, r.dest))
       } else if (r.seq > old.seq) {
         setRow(work, n, route)
         push(`${n} takes the route to ${r.dest} via ${u}: sequence ${r.seq} is newer than ${old.seq}.`, at(A.newer), mark)
+        why(WHY.newer(n, r.dest))
       } else if (r.seq === old.seq && m < old.metric) {
         setRow(work, n, route)
         push(
@@ -134,8 +141,10 @@ function receive(work: DsdvSnapshot, push: Push, u: string, receivers: string[],
           at(A.fewer),
           mark,
         )
+        why(WHY.fewer(n))
       } else {
         push(`${n} keeps its route to ${r.dest} via ${old.next}.`, at(A.keep))
+        why(WHY.keep(n, u, r.dest))
         continue
       }
       if (!changed.includes(n)) changed.push(n)
@@ -146,24 +155,26 @@ function receive(work: DsdvSnapshot, push: Push, u: string, receivers: string[],
 
 export function runAdvertise(state: DsdvState, input: unknown): Result {
   const work = cloneNet(state)
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const [u] = parseIds(input)
   if (!u || !work.tables[u]) {
     push(`There is no node ${u ?? 'by that name'} in this network.`, L.advertise.def)
+    why(WHY.unknown())
     return { steps, finalSnapshot: cloneNet(work) }
   }
-  advertise(work, push, u, null)
+  advertise(work, push, why, u, null)
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
 export function runMove(state: DsdvState, input: unknown): Result {
   const M = L.move
   const work = cloneNet(state)
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const ids = parseIds(input)
   const [u, near] = ids
   if (ids.length !== 2 || u === near || !work.tables[u] || !work.tables[near]) {
     push('Type the node that moves and the node it moves next to, such as M3 M6.', M.def)
+    why(WHY.moveInput())
     return { steps, finalSnapshot: cloneNet(work) }
   }
 
@@ -183,6 +194,7 @@ export function runMove(state: DsdvState, input: unknown): Result {
   push(`${u} moves next to ${near}: it loses ${names(lost)} and gains ${names(gained)} as neighbors.`, M.move, {
     nodes: { [u]: 'current' },
   })
+  why(WHY.moved(u))
 
   for (const v of [u, ...lost]) {
     const nbrs = neighbors(work, v)
@@ -192,12 +204,14 @@ export function runMove(state: DsdvState, input: unknown): Result {
     work.tables[v] = work.tables[v].filter((r) => !stale.includes(r))
     work.shown = v
     push(`${v} deletes ${plural(stale.length, 'route')} that went through ${listIds(gone)}.`, M.stale, { nodes: { [v]: 'current' } })
+    why(WHY.stale(v))
   }
 
   work.seqOf[u] += 1
   setRow(work, u, { dest: u, next: u, metric: 0, seq: work.seqOf[u], changed: true })
   work.shown = u
   push(`${u} raises its own sequence number to ${work.seqOf[u]}.`, M.seq, { nodes: { [u]: 'new' } })
+  why(WHY.seq(u))
 
   for (const n of gained) {
     const rows = work.tables[n].map((r) => ({ ...r }))
@@ -207,7 +221,8 @@ export function runMove(state: DsdvState, input: unknown): Result {
     push(`${n} is a new neighbor, so it sends ${u} its full table of ${plural(rows.length, 'row')}.`, M.full, { nodes: { [n]: 'current' } }, [
       { kind: 'UPDATE', from: n, to: u, label: plural(rows.length, 'row') },
     ])
-    receive(work, push, n, [u], rows, M.full)
+    why(WHY.fullToNewcomer(u, n))
+    receive(work, push, why, n, [u], rows, M.full)
   }
 
   const queue = [u]
@@ -215,10 +230,11 @@ export function runMove(state: DsdvState, input: unknown): Result {
   while (queue.length) {
     const v = queue.shift()!
     sent += 1
-    const changed = advertise(work, push, v, M.advertise)
+    const changed = advertise(work, push, why, v, M.advertise)
     for (const n of changed) if (!queue.includes(n)) queue.push(n)
   }
   push(`No table changed in the last round, so the update stops after ${plural(sent, 'advertisement')}.`, M.loop)
+  why(WHY.settled())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 

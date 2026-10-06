@@ -1,9 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { QosCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { qosOperations, randomNetwork, seedNetwork } from './operations'
 import { qosPseudocode } from './pseudocode'
+import { story } from './story'
 import { qosStructure } from './structure'
 import type { Metric, QosSnapshot, QosState } from './types'
 
@@ -17,7 +18,7 @@ export const qosRouting: TopicModule<QosState, QosSnapshot> = {
   operations: qosOperations,
   pseudocode: qosPseudocode,
   CanvasComponent: QosCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: qosStructure,
   variant: {
     id: 'metric',
@@ -32,4 +33,5 @@ export const qosRouting: TopicModule<QosState, QosSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asMetric(variant)),
   randomize: (_state, variant) => randomNetwork(asMetric(variant), newSeed()),
+  story,
 }

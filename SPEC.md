@@ -162,7 +162,7 @@ Topic-slug routes are canonical. The week is metadata shown in the sidebar and p
 
 Anything else redirects to `/`.
 
-`TopicPage` follows dsa-course Section 6 exactly: a two-column grid at `lg`, `VisualizerShell` on the left, materials on the right as tabs. The tabs are **Scenario** (default, only for a topic with a `story`, Section 20) | **Real-World Usage** (default otherwise) | **Core Material** | **Protocol**. Below `sm` the tab list is a two-column grid, so four tabs fit 400px. The first two render `content.realWorldUsage` and `content.coreMaterial` with `MarkdownContent`; Protocol renders `ProtocolPanel` over `structure`. At `lg` the page is locked to the viewport: the document never scrolls, and only the Code listing and the active materials panel do. Below `lg` the columns stack, visualizer first, and the document scrolls. `<TopicView key={slug}>` resets the visualizer, the tab, and the variant mirror on navigation.
+`TopicPage` follows dsa-course Section 6 exactly: a two-column grid at `lg`, `VisualizerShell` on the left, materials on the right as tabs. The tabs are **Scenario** (default, Section 20) | **Core Material** | **Protocol**. Scenario renders `story.scenario` and Core Material renders `content.coreMaterial`, both with `MarkdownContent`; Protocol renders `ProtocolPanel` over `structure`. At `lg` the page is locked to the viewport: the document never scrolls, and only the Code listing and the active materials panel do. Below `lg` the columns stack, visualizer first, and the document scrolls. `<TopicView key={slug}>` resets the visualizer, the tab, and the variant mirror on navigation.
 
 ## 7. Core Domain Types
 
@@ -185,7 +185,7 @@ Every listing in Sections 9.1, 10, and 19 is written in this style. An edit to a
 
 `highlightLine` is a 1-indexed line of that listing. There is no per-language line map; `L` names the lines of the one listing.
 
-**Amendment (Section 20, ADR-014).** `Step` gains `why?: string`, the reason for the step in plain words, and `TopicModule` gains `story?: TopicStory` (`src/types/story.ts`: `scenario`, Markdown for the Scenario tab, and `cast`, seed node id to the device it plays). `recorder()` in `src/lib/net.ts` returns `why(text)`, which sets the reason on the step pushed last. Both fields are optional until every topic has them (Section 15).
+**Amendment (Section 20, ADR-014).** `Step` gains `why?: string`, the reason for the step in plain words, and `TopicModule` gains `story?: TopicStory` (`src/types/story.ts`: `scenario`, Markdown for the Scenario tab, and `cast`, seed node id to the device it plays). `recorder()` in `src/lib/net.ts` returns `why(text)`, which sets the reason on the step pushed last. Both are required: every topic and case study simulator has a story, and every step has a why (ADR-015).
 
 `case-study.ts` is copied verbatim. `StructureChoice.cost` holds the trade-off the English reference states for the mechanism, with its book and page (for DSDV: "control overhead is high, so DSDV does not suit large networks", Loo p. 28), under the same quoting rule as Section 7.3.
 
@@ -1360,13 +1360,13 @@ The app reads English references instead, one per week, in `references/en/`:
 | `Week-7-QoS-Congestion-Energy.md` | `id/minggu-07.md` | `qos-routing` |
 | `Week-8-Security-Trust.md` | `id/minggu-08.md` | `routing-attacks` |
 
-Each file has YAML frontmatter (`week`, `title`, `source`, `status`, `books`) and four sections: `## 1. Learning Outcomes`, `## 2. Real-World Usage`, `## 3. Core Material`, `## 4. Summary`. Section 3 has one `###` subsection per slide part, and a subsection that feeds topics ends its heading with their slugs in braces, `{#slug}` or `{#slug-a #slug-b}`, for example `### 3.2 Reactive routing: AODV, DSR, TORA {#reactive-routing}`. A topic's `coreMaterial` is every subsection tagged with its slug, in file order, with the `{#slug}` marker removed (Week 1 tags both of its subsections `multihop`). A subsection without a slug (multicast, node cooperation, simulators) is course material the app does not show on a topic page in v1.
+Each file has YAML frontmatter (`week`, `title`, `source`, `status`, `books`) and four sections: `## 1. Learning Outcomes`, `## 2. Real-World Usage`, `## 3. Core Material`, `## 4. Summary`. Section 3 has one `###` subsection per slide part, and a subsection that feeds topics ends its heading with their slugs in braces, `{#slug}` or `{#slug-a #slug-b}`, for example `### 3.2 Reactive routing: AODV, DSR, TORA {#reactive-routing}`. A topic's `coreMaterial` is every subsection tagged with its slug, in file order, with the `{#slug}` marker removed (Week 1 tags both of its subsections `multihop`). A subsection without a slug (multicast, node cooperation, simulators) is course material the app does not show on a topic page in v1. Section 2, Real-World Usage, stays in the references, but the app no longer shows it: each topic's Scenario tab (Section 20) took its place, and a scenario quotes the facts it needs from the reference with their pages (ADR-015).
 
 **Status gate.** A reference starts as `status: draft`. The lecturer reviews it against the slides and the books and changes it to `status: reviewed`. `scripts/extract-content.mjs` refuses a draft: it fails with the file name and generates nothing for that week. A topic cannot be implemented (Section 15) until its reference is reviewed.
 
 **What the drafts may say.** Every claim in an English reference comes from the matching slide file: a slide bullet, a table row, or a `Catatan` note, translated, with the book and page the slide cites. Nothing is added from memory or from the books directly. Where the slide gives a number, the English file gives the same number and the same page. The drafts do not reproduce the slides' in-class answers to quiz questions, because the quiz belongs to the lecture.
 
-**Generation.** `scripts/extract-content.mjs` copies §2 into `realWorldUsage` and the slugged §3 subsections into `coreMaterial` for each topic, verbatim, into `src/topics/<slug>/content.ts` with the dsa-course header comment. Once a file is reviewed, only its punctuation may change (Section 18); a change of wording or claim goes back to `status: draft`.
+**Generation.** `scripts/extract-content.mjs` copies the slugged §3 subsections into `coreMaterial` for each topic, verbatim, into `src/topics/<slug>/content.ts` with the dsa-course header comment. Once a file is reviewed, only its punctuation may change (Section 18); a change of wording or claim goes back to `status: draft`.
 
 **Case study copy** (`scenario`, `reasoning`, decisions, quiz) is hand-written, as in dsa-course. Each scenario says it is illustrative, and every cost or property it states quotes the English reference of the week it names.
 
@@ -1421,8 +1421,7 @@ The tracker for every module. A row reaches **Specified** only when its full Sec
 | Case study `relief-camp` | 4–6 | uses Weeks 4–6 | Specified, 19.2 | Implemented |
 | Case study `community-mesh` | 7–8 | uses Weeks 7–8 | Specified, 19.3 | Implemented |
 | Beginner layer (Section 20): Start here, glossary | all | uses Week 1 | Specified, 20 | Implemented |
-| Beginner layer: story and why, `reactive-routing` | 2 | reviewed | Specified, 20 | Implemented (pilot) |
-| Beginner layer: story and why, every other topic and case study | 1–8 | reviewed | Specified, 20 | not started |
+| Beginner layer: story and why, every topic and case study | 1–8 | reviewed | Specified, 20 | Implemented |
 | Multicast (ODMRP mesh, MAODV tree) | 3 | draft (§3.2 of Week 3) | Not specified | not started |
 | Node cooperation (CONFIDANT, CORE, OCEAN) | 4 | draft (§3.2 of Week 4) | Not specified | not started |
 
@@ -1437,7 +1436,7 @@ Suggested build order: the shell and `NetworkCanvas` with `multihop`, then `reac
 - [ ] Every variant toggle swaps the operation list, the seed where the section says so, and the "on the canvas" badge in the Protocol tab.
 - [ ] Every seed that comes from a slide matches the slide's `graf:` block: node set, links, roles, and dashed links.
 - [ ] Every metrics run returns the same numbers for the same seed, pinned in `src/lib/sim/metrics.test.ts`, and the canvas labels them as computed by this simulator.
-- [ ] Real-World Usage and Core Material render on each topic page from a reviewed English reference; a draft reference blocks generation.
+- [ ] Core Material renders on each topic page from a reviewed English reference; a draft reference blocks generation. Each topic opens on its Scenario tab (Section 20).
 - [ ] The Protocol tab lists the messages with costs from the reference (or "Not stated in the course reference."), the invariants, and the per-node state, and the live fields row tracks the step shown.
 - [ ] Each Section 19 case study is reachable at `/case-study/:slug`, listed after the weeks, passes its `operations.test.ts` and `src/case-studies/case-studies.test.ts`, keeps the layout contract in `e2e/case-study-page.spec.ts`, and its quiz can be finished and retried by keyboard.
 - [ ] The Section 12 layout contract passes `npm run test:e2e` at desktop, tablet, and phone widths.
@@ -1733,12 +1732,16 @@ Seed results with M joined and 20 packets: the hop mesh delivers none, because e
 
 The course assumes a student who has met networking before. The beginner layer is for one who has not: every topic tells a real-world story over its slide network, every step says why it happens, jargon opens a definition, and a Start here page comes before Week 1. It changes no seed, step description, `highlightLine`, or pinned result of Sections 10 and 19.
 
-**Story** (`story.ts` per topic, `TopicStory`). The Scenario tab renders `story.scenario` with glossary terms marked. It opens with "*Illustrative scenario*", says the slides draw the network as the seed's nodes, and says the slides do not describe the story's setting. It names who each node is, says why the week's mechanism suits the setting (quoting the English reference with its book and page), and ends with a numbered "Try this" list: operations and inputs in run order, each with what to watch. The story keeps the slide labels: `cast` maps seed node ids to devices, and every key is a seed node.
+**Story** (`story.ts` per topic, `TopicStory`). The Scenario tab, the default and first tab, renders `story.scenario` with glossary terms marked. It opens with "*Illustrative scenario*", says the slides draw the network as the seed's nodes, and says the slides do not describe the story's setting. It names who each node is, says why the week's mechanism suits the setting (quoting the English reference with its book and page), and ends with a numbered "Try this" list: operations and inputs in run order, each with what to watch. The story keeps the slide labels: `cast` maps seed node ids to devices, and every key is a seed node.
 
-**Why** (`why.ts` per topic, one function per step kind). Every step of every operation sets `why`, under the Section 18 why house style. `src/topics/explain.test.ts` runs every operation of every topic in its `WITH_STORY` list over `test-inputs.ts` and over chains of operations, and fails on a missing, long, or three-sentence why; it also checks the cast and the illustrative label.
+**Why** (`why.ts` per topic, one function per step kind). Every step of every operation sets `why`, under the Section 18 why house style. `src/topics/explain.test.ts` fails on a missing, long, or three-sentence why, and checks the cast and the illustrative label.
 
 **Glossary** (`src/content/glossary.ts`, `src/lib/glossary.ts`, `GlossaryText`). Each entry has a term, its spellings, and a plain definition; a definition that states a book fact cites it. In the narration box, the Why line, and a scenario, the first occurrence of each term per panel or document becomes a button that opens the definition. Acronyms match case-sensitively and words in any case, the longest spelling first, never inside a hyphenated link name. The course references are not marked, because they are quoted verbatim.
 
 **Start here** (`/start`, `StartPage`, first in the sidebar, linked from the home page). It contrasts an infrastructure network with an ad hoc one (Loo 1.2, pp. 4-5), quotes the definition of Loo p. 5, lists the basic glossary terms, and runs a four-phone walkthrough (`src/start/intro.ts`, an unregistered `TopicModule`) in the same `VisualizerShell`: Send a message by fewest hops, and Phone walks away. It ends with how a topic page works and a link to Week 1.
 
-**Rollout.** Reactive Routing is the pilot. The remaining topics and the case studies follow in week order once the lecturer approves the pilot; a case study keeps its own Scenario tab and gains `why` on its steps. When the last one lands, `story` and `why` become required.
+**Case studies.** A case study keeps its own Scenario tab (Section 19); its simulator's `story` reuses that scenario and adds the `cast` for the Who's who line, and every simulator step has a `why`. The steps of the shared metrics run (`pushMetricsSteps`) and the shared DSR flood (`floodRreq`) take a `why` setter and explain themselves.
+
+**Who's who** lists the cast members that are nodes of the active variant's seed, so it never changes while stepping. After Randomize it says the story roles do not apply, unless Randomize restored the seed's nodes (Section 10.11).
+
+**Coverage.** `src/topics/explain.test.ts` runs every topic, every case study simulator, and the Start here walkthrough, on every variant's seed and on chains of operations that reach the branches a fresh seed cannot. `e2e/beginner-layer.spec.ts` opens every topic and case study at 400px.

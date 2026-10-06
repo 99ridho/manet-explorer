@@ -77,12 +77,12 @@ export interface TopicModule<TState = unknown, TSnapshot = unknown> {
   operations: OperationDefinition<TState, unknown, TSnapshot>[]
   pseudocode: Record<string, string[]> // operationId -> lines of pseudocode
   CanvasComponent: React.ComponentType<{ snapshot: TSnapshot; variant?: string }>
-  content: { realWorldUsage: string; coreMaterial: string }
+  content: { coreMaterial: string } // SPEC.md §11; the Scenario tab replaced Real-World Usage (§20)
   structure: StructureSpec<TSnapshot> // the Protocol spec of SPEC.md §7.3 (ProtocolPanel, LiveFields)
   variant?: VariantConfig
   createInitialState: (variant?: string) => TState
   randomize: (state: TState, variant?: string) => TState // instant, no animation
-  story?: TopicStory // SPEC.md §20: the Scenario tab and the Who's who line
+  story: TopicStory // SPEC.md §20: the Scenario tab and the Who's who line
 }
 
 /** Input shapes produced by OperationBar for each `inputKind`. */

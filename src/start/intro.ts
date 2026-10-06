@@ -194,7 +194,7 @@ export const intro: TopicModule<IntroSnapshot, IntroSnapshot> = {
   operations,
   pseudocode: introPseudocode,
   CanvasComponent: IntroCanvas,
-  content: { realWorldUsage: '', coreMaterial: '' },
+  content: { coreMaterial: '' },
   structure,
   createInitialState: introSeed,
   randomize: () => randomIntro(newSeed()),

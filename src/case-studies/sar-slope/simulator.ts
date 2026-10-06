@@ -1,8 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { SarCanvas } from './canvas'
+import { scenario } from './content'
 import { RELAY_LABEL, randomNetwork, sarOperations, seedNetwork } from './operations'
 import { sarPseudocode } from './pseudocode'
+import { cast } from './story'
 import { sarStructure } from './structure'
 import type { Relay, SarSnapshot, SarState } from './types'
 
@@ -15,7 +17,7 @@ export const sarSimulator: TopicModule<SarState, SarSnapshot> = {
   operations: sarOperations,
   pseudocode: sarPseudocode,
   CanvasComponent: SarCanvas,
-  content: { realWorldUsage: '', coreMaterial: '' },
+  content: { coreMaterial: '' },
   structure: sarStructure,
   variant: {
     id: 'relay',
@@ -28,4 +30,5 @@ export const sarSimulator: TopicModule<SarState, SarSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asRelay(variant)),
   randomize: (_state, variant) => randomNetwork(asRelay(variant), newSeed()),
+  story: { scenario, cast },
 }

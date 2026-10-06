@@ -1,5 +1,5 @@
 // SPEC.md §8/§9: owns the persistent TState and the playback for the last operation's steps.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePlayback } from '@/lib/step-engine'
 import type { Step, TopicModule } from '@/types/step-engine'
@@ -11,6 +11,10 @@ import { WhosWho } from './WhosWho'
 import { parseInput } from './input-parsing'
 
 const NO_STEPS: Step<unknown>[] = []
+
+type WithNodes = { nodes?: { id: string; x: number; y: number }[] }
+const nodeIds = (s: unknown) => ((s as WithNodes).nodes ?? []).map((n) => n.id)
+const nodesOf = (s: unknown) => JSON.stringify(((s as WithNodes).nodes ?? []).map((n) => [n.id, n.x, n.y]))
 
 // v1 contract: every topic defines TState = TSnapshot (SPEC.md §10), so an operation's
 // finalSnapshot becomes the next persistent state.
@@ -35,6 +39,8 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
   const currentOperation =
     visibleOperations.find((op) => op.id === currentOperationId) ?? visibleOperations[0] ?? null
   const displayedSnapshot = playback.currentStep?.snapshot ?? state
+  // The variant's seed decides whose roles Who's who lists, so stepping never changes the line.
+  const castIds = useMemo(() => new Set(nodeIds(topic.createInitialState(variant))), [topic, variant])
   const Canvas = topic.CanvasComponent
 
   const handleGo = useCallback(() => {
@@ -52,8 +58,10 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
 
   // Randomize and Reset bypass the step engine entirely (§9).
   const handleRandomize = () => {
-    setState((s: unknown) => topic.randomize(s, variant))
-    setRandomized(true)
+    const next = topic.randomize(state, variant)
+    setState(next)
+    // A topic whose Randomize restores its scene (Week 8) keeps the story's cast.
+    setRandomized(nodesOf(next) !== nodesOf(topic.createInitialState(variant)))
     setSteps(NO_STEPS)
     setInputError(null)
   }
@@ -110,7 +118,7 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
         <CardContent>
           <Canvas snapshot={displayedSnapshot} variant={variant} />
           <LiveFields structure={topic.structure} snapshot={displayedSnapshot} variant={variant} />
-          {topic.story && <WhosWho story={topic.story} randomized={randomized} />}
+          <WhosWho story={topic.story} ids={castIds} randomized={randomized} />
         </CardContent>
       </Card>
 

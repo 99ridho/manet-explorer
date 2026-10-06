@@ -1,8 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { CampCanvas } from './canvas'
+import { scenario } from './content'
 import { MOBILITY_LABEL, campOperations, seedNetwork } from './operations'
 import { campPseudocode } from './pseudocode'
+import { cast } from './story'
 import { campStructure } from './structure'
 import type { CampSnapshot, CampState, Mobility } from './types'
 
@@ -15,7 +17,7 @@ export const campSimulator: TopicModule<CampState, CampSnapshot> = {
   operations: campOperations,
   pseudocode: campPseudocode,
   CanvasComponent: CampCanvas,
-  content: { realWorldUsage: '', coreMaterial: '' },
+  content: { coreMaterial: '' },
   structure: campStructure,
   variant: {
     id: 'mobility',
@@ -29,4 +31,5 @@ export const campSimulator: TopicModule<CampState, CampSnapshot> = {
   createInitialState: (variant) => seedNetwork(asMobility(variant)),
   // A fresh seed redraws the movement; the camp itself, its addresses, and its heads stay.
   randomize: (_state, variant) => seedNetwork(asMobility(variant), newSeed()),
+  story: { scenario, cast },
 }

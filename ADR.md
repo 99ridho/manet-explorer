@@ -100,3 +100,10 @@ QoS routing labels only what the active metric uses: Mbps for bandwidth, ETX for
 
 Students new to networking get a story per topic, a reason on every step, a glossary, and a Start here page (SPEC §20). The stories cast the slide nodes as devices instead of drawing new seeds, so the canvas still matches the lecture figures and no step table or pinned result changes. A why may reason about the mechanism beyond the slides; numbers and book facts still follow §18. `Step.why` and `TopicModule.story` amend §7.1, optional until every topic has them, and a step's reason is set with `why()` after `push()` so the existing push calls keep their shape. Glossary terms open a Radix popover on click, tap, or Enter, because a tooltip does not open on touch. Which block marked a term first is kept in a map keyed by block, because a set filled during render was already full on React's second StrictMode render and marked nothing. Reactive Routing is the pilot; the other weeks follow after review.
 
+## ADR-015: Scenario replaces Real-World Usage
+
+- Date: 2026-10-06
+- Status: Accepted
+
+Every topic and case study simulator now has a story and a why on every step, so `story` is required on `TopicModule`. The Scenario tab took the place of Real-World Usage at the course owner's request, because a worked story covers what that tab was for. `content` keeps `coreMaterial` only, and `extract-content.mjs` no longer copies §2 of the references, which stay unchanged. A scenario that needs a §2 fact quotes it with its page. Who's who lists only the active variant's seed nodes, because the Week 8 variants and the case studies cast nodes the other variants lack. Randomize marks the story roles as not applying only when the nodes really changed, because Week 8's Randomize restores its scene.
+

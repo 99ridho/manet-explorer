@@ -87,6 +87,7 @@ export function pushMetricsSteps(
 
   designs: { label: string; runs: FlowRun[] }[],
   setResult: (r: MetricsResult | undefined) => void,
+  why: (text: string) => void, // SPEC.md §20: sets the reason on the step pushed last
 ) {
   const summaries: Summary[] = []
   for (const d of designs) {
@@ -99,6 +100,11 @@ export function pushMetricsSteps(
         [],
         { pdr: fmtPdr(s.pdr), delay: fmtDelay(s.delay), overhead: fmtOverhead(s.overhead) },
       )
+      why(
+        i === 0
+          ? `${d.label} runs the same flows on the same network as the other design, so any difference comes from the design alone.`
+          : 'The numbers under the step add this flow to the ones before it: delivery ratio, delay, and control overhead.',
+      )
     })
     summaries.push(summarize(d.runs))
   }
@@ -108,6 +114,7 @@ export function pushMetricsSteps(
     `On ${scope}, ${a.label} delivers ${fmtPdr(summaries[0].pdr)} % and ${b.label} delivers ${fmtPdr(summaries[1].pdr)} %.`,
     ML.result,
   )
+  why('Both designs carried the same traffic, so the gap between the bars comes from the design. This simulator computed these numbers; they are not figures from the books.')
   setResult(undefined)
   return summaries
 }

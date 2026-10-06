@@ -9,6 +9,7 @@ import type { HighlightKind, NetLink, NetNode } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { EvaluationSnapshot, EvaluationState, Graph } from './types'
+import { WHY } from './why'
 
 type Result = OperationResult<EvaluationSnapshot>
 
@@ -71,7 +72,7 @@ export function runBuildLinks(state: EvaluationState): Result {
   work.links = []
   work.marked = []
   work.cds = []
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const rng = mulberry32(work.seed)
   const range = short(work.range)
   const inner = short(Q * work.range)
@@ -86,16 +87,23 @@ export function runBuildLinks(state: EvaluationState): Result {
         work.links.push(makeLink(p, q))
         const key = `${p < q ? p : q}-${p < q ? q : p}`
         const hl = { ...pair, links: { [key]: 'new' as HighlightKind } }
-        if (band === 'between')
+        if (band === 'between') {
           push(`${p} and ${q} are ${f2(d)} apart, between ${inner} and ${range}, and the draw says yes: link ${p}-${q}.`, B.linked, hl)
-        else push(`${p} and ${q} are ${f2(d)} apart, within range ${range}: link ${p}-${q}.`, B.linked, hl)
+          why(WHY.between())
+        } else {
+          push(`${p} and ${q} are ${f2(d)} apart, within range ${range}: link ${p}-${q}.`, B.linked, hl)
+          why(WHY.linked(p, q))
+        }
       } else if (band === 'between') {
         push(`${p} and ${q} are ${f2(d)} apart, between ${inner} and ${range}, and the draw says no: no link.`, B.notLinked, pair)
+        why(WHY.between())
       } else {
         push(`${p} and ${q} are ${f2(d)} apart, beyond range ${range}, so they cannot hear each other.`, B.notLinked, pair)
+        why(WHY.apart())
       }
     }
   push(`Build links made ${plural(work.links.length, 'link')} among ${plural(ns.length, 'node')}.`, B.result)
+  why(WHY.built())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -126,7 +134,7 @@ export function runCds(state: EvaluationState): Result {
   delete work.metrics
   work.marked = []
   work.cds = []
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const marks: Record<string, HighlightKind> = {}
   for (const v of work.nodes.map((n) => n.id)) {
     const pair = unlinkedPair(work, v)
@@ -134,9 +142,11 @@ export function runCds(state: EvaluationState): Result {
       work.marked.push(v)
       marks[v] = 'found'
       push(`${pair[0]} and ${pair[1]} are neighbors of ${v} but not of each other, so ${v} is marked.`, C.marked, { nodes: { ...marks } })
+      why(WHY.marked(v))
     } else {
       marks[v] = 'visited'
       push(`Every two neighbors of ${v} are neighbors of each other, so ${v} is not marked.`, C.notMarked, { nodes: { ...marks } })
+      why(WHY.notMarked(v))
     }
   }
   const kept = new Set(work.marked)
@@ -145,11 +155,13 @@ export function runCds(state: EvaluationState): Result {
     if (u === null) {
       marks[v] = 'found'
       push(`No marked neighbor with a larger id covers all of ${v}'s neighbors, so ${v} stays.`, C.kept, { nodes: { ...marks, [v]: 'current' } })
+      why(WHY.kept(v))
       continue
     }
     kept.delete(v)
     marks[v] = 'dropped'
     push(`${u} has a larger id and covers ${v} and all its neighbors, so ${v} is unmarked.`, C.pruned, { nodes: { ...marks } })
+    why(WHY.pruned(v, u))
   }
   work.cds = work.marked.filter((v) => kept.has(v))
   push(
@@ -157,6 +169,7 @@ export function runCds(state: EvaluationState): Result {
     C.result,
     { nodes: Object.fromEntries(work.cds.map((v) => [v, 'tree' as HighlightKind])) },
   )
+  why(WHY.result())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -188,10 +201,11 @@ export function seedRun(graph: Graph, s: number) {
 export function runMetrics(state: EvaluationState, input: unknown): Result {
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const k = Number(input)
   if (!Number.isInteger(k) || k < 1 || k > 10) {
     push('Type a number of seeds from 1 to 10.', ML.def)
+    why(WHY.seeds())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const order: Graph[] = work.graph === 'udg' ? ['udg', 'qudg'] : ['qudg', 'udg']
@@ -205,6 +219,7 @@ export function runMetrics(state: EvaluationState, input: unknown): Result {
         delay: fmtDelay(r.delay),
         overhead: fmtOverhead(r.overhead),
       })
+      why(WHY.seed())
     }
     return runs
   })
@@ -234,6 +249,7 @@ export function runMetrics(state: EvaluationState, input: unknown): Result {
     `Over ${plural(k, 'seed')}, ${a} delivers ${pdr.labels[0]} % (standard deviation ${sd(0)}) and ${b} ${pdr.labels[1]} % (standard deviation ${sd(1)}).`,
     ML.result,
   )
+  why(WHY.spread())
   delete work.metrics
   return { steps, finalSnapshot: cloneNet(work) }
 }

@@ -1,4 +1,4 @@
-// SPEC.md §11: copies §2 and the slugged §3 subsections of each references/en file into
+// SPEC.md §11: copies the slugged §3 subsections of each references/en file into
 // src/topics/<slug>/content.ts, verbatim. A reference that is not `status: reviewed` stops the run.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 
@@ -68,22 +68,17 @@ for (const [slug, file] of topics) {
     continue
   }
   const lines = body.split('\n')
-  const real = trim(section(lines, /^## 2\. Real-World Usage/, file))
   const core = trim(slugged(section(lines, /^## 3\. Core Material/, file), slug))
   if (!core) throw new Error(`${file}: no §3 subsection is tagged {#${slug}}`)
   mkdirSync(`src/topics/${slug}`, { recursive: true })
-  const out = `// SPEC.md §11: generated from references/en/${file} (§2 and the {#${slug}} subsections of §3).
+  const out = `// SPEC.md §11: generated from references/en/${file} (the {#${slug}} subsections of §3).
 // Do not edit: regenerate with \`node scripts/extract-content.mjs\` after the reference changes.
-
-export const realWorldUsage = \`
-${esc(real)}
-\`.trim()
 
 export const coreMaterial = \`
 ${esc(core)}
 \`.trim()
 `
   writeFileSync(`src/topics/${slug}/content.ts`, out)
-  console.log(`${slug}: real=${real.length} chars, core=${core.length} chars`)
+  console.log(`${slug}: core=${core.length} chars`)
 }
 if (failed) process.exit(1)

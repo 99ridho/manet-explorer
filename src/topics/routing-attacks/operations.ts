@@ -5,6 +5,7 @@ import type { HighlightKind } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { AttackSnapshot, AttackState, Attacker } from './types'
+import { WHY } from './why'
 
 type Result = OperationResult<AttackSnapshot>
 
@@ -73,15 +74,17 @@ export function runDiscover(state: AttackState): Result {
   const work = cloneNet(state)
   work.routes = []
   work.route = null
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const rules = { blackHole: (id: string) => isBlackHole(work, id), farEnd: (id: string) => farEnd(work, id) }
-  work.routes = floodRreq(work, SRC, DST, rules, push, D).routes
+  work.routes = floodRreq(work, SRC, DST, rules, push, why, D).routes
   if (work.routes.length === 0) {
     push(`No RREP reached ${SRC}, so there is no route to ${DST}.`, D.pick)
+    why(WHY.noAnswer())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   work.route = work.routes[0]
   push(`${SRC} uses the first route to arrive: ${listIds(work.route)}.`, D.pick, { links: tree(work.route), path: work.route })
+  why(WHY.pick())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -95,15 +98,17 @@ const isTunnel = (s: AttackSnapshot, a: string, b: string) => !!findLink(s, a, b
 export function runSend(state: AttackState, input: unknown): Result {
   const S = L.send
   const work = cloneNet(state)
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const k = packetsFrom(input)
   if (k === null) {
     push('Type a number of packets from 1 to 20.', S.def)
+    why(WHY.packets())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const route = work.route
   if (!route) {
     push('There is no route yet. Run Discover route first.', S.def)
+    why(WHY.noRoute())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   for (let i = 0; i < k; i++) {
@@ -116,6 +121,7 @@ export function runSend(state: AttackState, input: unknown): Result {
         delivered = false
         work.dropped += 1
         push(`${v} drops packet ${p} without a trace.`, S.drop, { nodes: { [v]: 'dropped' }, links: tree(route) })
+        why(WHY.drop(v))
         break
       }
       if (isTunnel(work, v, nxt)) {
@@ -123,6 +129,7 @@ export function runSend(state: AttackState, input: unknown): Result {
         push(`Packet ${p} crosses the tunnel from ${v} to ${nxt}.`, S.tunnel, { links: { ...tree(route), [linkKey(v, nxt)]: 'active' } }, [
           { kind: 'DATA', from: v, to: nxt, label: `${p}` },
         ])
+        why(WHY.tunnel())
       }
     }
     if (delivered) {
@@ -130,6 +137,7 @@ export function runSend(state: AttackState, input: unknown): Result {
       push(`Packet ${p} reaches ${DST}.`, S.done, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [
         { kind: 'DATA', from: route[route.length - 2], to: DST, label: `${p}` },
       ])
+      why(WHY.delivered())
     }
   }
   return { steps, finalSnapshot: cloneNet(work) }
@@ -138,14 +146,16 @@ export function runSend(state: AttackState, input: unknown): Result {
 export function runWatchdog(state: AttackState, input: unknown): Result {
   const W = L.watchdog
   const work = cloneNet(state)
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const k = packetsFrom(input)
   if (k === null) {
     push('Type a number of packets from 1 to 20.', W.def)
+    why(WHY.packets())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   if (!work.route) {
     push('There is no route yet. Run Discover route first.', W.def)
+    why(WHY.noRoute())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   for (let i = 0; i < k && work.route; i++) {
@@ -160,6 +170,7 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
         push(`Packet ${p} reaches ${DST}.`, W.heard, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [
           { kind: 'DATA', from: v, to: nxt, label: `${p}` },
         ])
+        why(WHY.delivered())
         break
       }
       // This demo counts a forward into the tunnel as heard; a black hole forwards nothing.
@@ -167,6 +178,7 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
         push(`${v} hears ${nxt} forward packet ${p}.`, W.heard, { links: { [linkKey(v, nxt)]: 'tree' } }, [
           { kind: 'DATA', from: v, to: nxt, label: `${p}` },
         ])
+        why(WHY.heard(v, nxt))
         continue
       }
       work.dropped += 1
@@ -175,9 +187,11 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
       push(`${v} never hears ${nxt} forward packet ${p}: ${f} ${f === 1 ? 'failure' : 'failures'} for ${nxt}.`, W.silence, {
         nodes: { [nxt]: 'flagged' },
       })
+      why(WHY.silence(v, nxt))
       if (f > THRESHOLD && !work.flagged.includes(nxt)) {
         work.flagged = [...work.flagged, nxt]
         push(`${nxt} passed the threshold of ${THRESHOLD}, so ${v} reports it${v === SRC ? '' : ` to ${SRC}`}.`, W.report, { nodes: { [nxt]: 'flagged' } })
+        why(WHY.report(v, nxt))
         const other = work.routes.find((r) => !r.includes(nxt)) ?? null
         work.route = other
         push(
@@ -187,6 +201,7 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
           W.reroute,
           other ? { links: tree(other), path: other } : { nodes: { [nxt]: 'flagged' } },
         )
+        why(other ? WHY.reroute(nxt) : WHY.noOther())
       }
       break
     }

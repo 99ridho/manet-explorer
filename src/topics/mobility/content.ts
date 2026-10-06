@@ -1,13 +1,5 @@
-// SPEC.md §11: generated from references/en/Week-5-Mobility-Propagation.md (§2 and the {#mobility} subsections of §3).
+// SPEC.md §11: generated from references/en/Week-5-Mobility-Propagation.md (the {#mobility} subsections of §3).
 // Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
-
-export const realWorldUsage = `
-A mobility model can mislead at three levels (Misra 10.4, p. 249). The absolute value: an overhead of 5 % in simulation can become 50 % in the field. The direction of change: in simulation throughput rises as range grows, in the field it falls. The ranking: protocol A wins under one model and loses under another. Because a MANET depends on intermediate nodes, the mobility model matters far more than in single-hop networks such as WLAN and cellular (p. 250).
-
-The evidence (Misra chapter 10, p. 249, citing study [7]): AODV delivers 84 % under high-speed random waypoint, against 59 % for DSDV in the same scenario; under RPGM, DSDV delivers 97 % and AODV about 87 %. If the mobility model does not match the real scenario, the conclusion "protocol A is better than B" can reverse in deployment. This is also a problem for IETF standardization work, which compares proposals through simulation.
-
-Group models fit real groups (Misra pp. 244-245): military units, SAR teams, campus groups. Changing only the group trajectories gives different scenarios: groups that barely move and never meet (military units in separate areas), overlapping trajectories (disaster recovery), and the same trajectory at different times (groups visiting a museum or exhibition one after another).
-`.trim()
 
 export const coreMaterial = `
 ### 3.1 The choice of model changes the result

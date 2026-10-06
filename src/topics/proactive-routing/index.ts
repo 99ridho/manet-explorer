@@ -1,9 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { ProactiveCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { proactiveOperations, randomNetwork, seedNetwork } from './operations'
 import { proactivePseudocode } from './pseudocode'
+import { story } from './story'
 import { proactiveStructure } from './structure'
 import type { DsdvSnapshot, DsdvState, Update } from './types'
 
@@ -16,7 +17,7 @@ export const proactiveRouting: TopicModule<DsdvState, DsdvSnapshot> = {
   operations: proactiveOperations,
   pseudocode: proactivePseudocode,
   CanvasComponent: ProactiveCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: proactiveStructure,
   variant: {
     id: 'update',
@@ -29,4 +30,5 @@ export const proactiveRouting: TopicModule<DsdvState, DsdvSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asUpdate(variant)),
   randomize: (_state, variant) => randomNetwork(asUpdate(variant), newSeed()),
+  story,
 }

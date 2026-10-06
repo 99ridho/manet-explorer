@@ -1,13 +1,5 @@
-// SPEC.md §11: generated from references/en/Week-8-Security-Trust.md (§2 and the {#routing-attacks} subsections of §3).
+// SPEC.md §11: generated from references/en/Week-8-Security-Trust.md (the {#routing-attacks} subsections of §3).
 // Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
-
-export const realWorldUsage = `
-The routing protocols of Weeks 2 and 3 assume every node is honest. Attackers exploit that assumption (Misra chapter 18).
-
-Prevention alone is not enough. Nodes must detect misbehavior and decide whom to trust (Misra chapters 17 and 19).
-
-The security project direction in the course asks students to run the same scenario with and without attacking nodes and to measure the drop in packet delivery ratio, the rise in delay, and the change in control overhead, then to add a detection mechanism and measure how much of the loss it recovers. A reference figure from Misra (p. 445): the watchdog and pathrater raise throughput by 17 % when 40 % of nodes misbehave, at an overhead of 9 to 17 percent.
-`.trim()
 
 export const coreMaterial = `
 ### 3.1 Attacks on routing

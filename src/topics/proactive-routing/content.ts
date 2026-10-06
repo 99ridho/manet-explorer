@@ -1,13 +1,5 @@
-// SPEC.md §11: generated from references/en/Week-2-Routing.md (§2 and the {#proactive-routing} subsections of §3).
+// SPEC.md §11: generated from references/en/Week-2-Routing.md (the {#proactive-routing} subsections of §3).
 // Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
-
-export const realWorldUsage = `
-In a MANET there are no dedicated routers. A node that sends data also forwards packets for other nodes, and every host takes part in finding and maintaining routes (Loo 2.6, pp. 31-32).
-
-Routing only becomes a problem when there is a choice. With three nodes in a line, A and C each know B, so both simply use B, and no routing protocol is needed (Misra Example 4.1, pp. 61-62). Add a fourth node D, and a packet from A to C can go A-B-C, A-D-C, A-D-B-C, or A-B-D-C; now a protocol must pick one path and update it as nodes move (Misra Example 4.2, pp. 62-63). Misra stresses that giving every node the full topology is not efficient for a MANET.
-
-Where the protocols fit (Misra 4.4, pp. 88-89): in a network that is relatively static, proactive protocols are efficient because keeping the topology pays off; as mobility rises, reactive protocols work better, and they are also preferred under heavy traffic. Misra suggests AODV, DSR, and OLSR for small networks and TORA, LANMAR, and ZRP for large ones, and concludes that no single protocol suits every situation and that a hybrid approach is often the right one. Militaries move in groups, and Misra names LANMAR and OLSR as suited to group movement (pp. 86-87).
-`.trim()
 
 export const coreMaterial = `
 ### 3.1 Why MANET routing is hard

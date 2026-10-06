@@ -1,11 +1,5 @@
-// SPEC.md §11: generated from references/en/Week-6-Modeling-Simulation.md (§2 and the {#evaluation} subsections of §3).
+// SPEC.md §11: generated from references/en/Week-6-Modeling-Simulation.md (the {#evaluation} subsections of §3).
 // Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
-
-export const realWorldUsage = `
-A model is a simplified representation of a real system, and a simulation runs that model to observe its behavior. The research community uses simulators because a MANET can have hundreds of nodes moving over a wide area, funding daily experiments with hundreds of moving nodes is unrealistic, and some applications cannot be tested in the field at all (Loo pp. 39 and 58). The challenge is balancing detail and speed: the more OSI layers a simulator models, the slower it runs.
-
-Results must be read with care. Loo chapter 4 compares AODV, DSR, and OLSR on one test bench, and OLSR comes out both best and worst depending on the metric (section 3.3). The same chapter gives two different statements about delay, and the lesson is to check the results section, not only the conclusion, and to name the source when quoting.
-`.trim()
 
 export const coreMaterial = `
 ### 3.1 Models simplify the network

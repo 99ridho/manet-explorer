@@ -1,9 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { MultihopCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { multihopOperations, randomNetwork, seedNetwork } from './operations'
 import { multihopPseudocode } from './pseudocode'
+import { story } from './story'
 import { multihopStructure } from './structure'
 import type { LinkModel, MultihopSnapshot, MultihopState } from './types'
 
@@ -16,7 +17,7 @@ export const multihop: TopicModule<MultihopState, MultihopSnapshot> = {
   operations: multihopOperations,
   pseudocode: multihopPseudocode,
   CanvasComponent: MultihopCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: multihopStructure,
   variant: {
     id: 'model',
@@ -29,4 +30,5 @@ export const multihop: TopicModule<MultihopState, MultihopSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asModel(variant)),
   randomize: (_state, variant) => randomNetwork(asModel(variant), newSeed()),
+  story,
 }

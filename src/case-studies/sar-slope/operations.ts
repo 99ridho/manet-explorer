@@ -11,6 +11,7 @@ import type { HighlightKind, NetSnapshot } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { Focus, Relay, SarSnapshot, SarState } from './types'
+import { WHY } from './why'
 
 type Result = OperationResult<SarSnapshot>
 
@@ -131,12 +132,13 @@ export function runDiscover(state: SarState, input: unknown): Result {
   const D = L.discover
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const at = (focus: Focus) => (work.focus = focus)
   const src = teamRadio(work, input)
   if (!src) {
     at('topology')
     push('Type a team radio: T1, T2, or T3.', D.def)
+    why(WHY.needTeam())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   settle(work)
@@ -144,6 +146,7 @@ export function runDiscover(state: SarState, input: unknown): Result {
   Object.assign(work, { reverse: {}, route: {}, flow: src, tx: 0, dupes: 0, txBy: {}, dupBy: {} })
   at('topology')
   push(`${src} needs a route to G, so it starts a route discovery.`, D.start, { nodes: { [src]: 'current' } })
+  why(WHY.start(src))
 
   at('broadcast')
   const mpr = work.relay === 'mpr'
@@ -157,6 +160,7 @@ export function runDiscover(state: SarState, input: unknown): Result {
     if (v === GATEWAY) continue
     if (from !== null && mpr && !work.mpr[from]?.includes(v)) {
       push(`${v} is not an MPR of ${from}, so it does not relay.`, D.silent, { nodes: { ...got }, links: { ...reached } }, [], vars())
+      why(WHY.silent(v, from))
       continue
     }
     const nbrs = neighbors(work, v)
@@ -165,17 +169,20 @@ export function runDiscover(state: SarState, input: unknown): Result {
     push(`${v} transmits the RREQ to ${listIds(nbrs)}.`, D.transmit, { nodes: { ...got, [v]: 'current' }, links: { ...reached } }, [
       { kind: 'RREQ', from: v, to: '*' },
     ], vars())
+    why(v === src ? WHY.transmitSrc(v) : mpr ? WHY.transmitMpr(v) : WHY.transmitFlood(v))
     for (const n of nbrs) {
       if (seen.has(n)) {
         work.dupes += 1
         work.dupBy = { ...work.dupBy, [n]: (work.dupBy[n] ?? 0) + 1 }
         push(`${n} already has the RREQ, so this copy is a duplicate.`, D.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...reached } }, [], vars())
+        why(WHY.dup(n))
         continue
       }
       seen.add(n)
       work.reverse = { ...work.reverse, [n]: v }
       reached[linkKey(v, n)] = 'tree'
       push(`${n} records ${v} as its way back to ${src}.`, D.first, { nodes: { ...got, [n]: 'new' }, links: { ...reached, [linkKey(v, n)]: 'new' } }, [], vars())
+      why(WHY.first(n, src))
       got[n] = 'visited'
       queue.push([n, v])
     }
@@ -184,6 +191,7 @@ export function runDiscover(state: SarState, input: unknown): Result {
   at('route')
   if (!seen.has(GATEWAY)) {
     push(`The RREQ never reached G: there is no route from ${src}.`, D.rrep)
+    why(WHY.noRoute())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const rrep: Record<string, HighlightKind> = {}
@@ -200,6 +208,7 @@ export function runDiscover(state: SarState, input: unknown): Result {
       { nodes: { [prev]: 'current' }, links: { ...rrep } },
       [{ kind: 'RREP', from: w, to: prev }],
     )
+    why(WHY.rrep(prev))
     w = prev
   }
   return { steps, finalSnapshot: cloneNet(work) }
@@ -210,27 +219,32 @@ export function runSend(state: SarState, input: unknown): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'route'
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const src = teamRadio(work, input)
   if (!src) {
     push('Type a team radio: T1, T2, or T3.', S.def)
+    why(WHY.needTeam())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const route = currentRoute(work, src)
   if (!route) {
     push(`${src} has no route to G. Run Discover route to base first.`, S.noRoute)
+    why(WHY.noTableRoute(src))
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const done: Record<string, HighlightKind> = {}
   for (let i = 0; i + 1 < route.length; i++) {
     const [v, nxt] = [route[i], route[i + 1]]
     push(`${v} looks up G in its table: next hop ${nxt}.`, S.lookup, { nodes: { [v]: 'current' }, links: { ...done }, path: route })
+    why(WHY.lookup(v))
     done[linkKey(v, nxt)] = 'tree'
     push(`The report moves from ${v} to ${nxt}.`, S.forward, { nodes: { [nxt]: 'current' }, links: { ...done }, path: route }, [
       { kind: 'DATA', from: v, to: nxt },
     ])
+    why(WHY.forward(v, nxt))
   }
   push(`The report reaches G after ${plural(route.length - 1, 'hop')}.`, S.done, { nodes: { [GATEWAY]: 'found' }, links: { ...done }, path: route })
+  why(WHY.delivered())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -238,22 +252,25 @@ export function runWalkAway(state: SarState, input: unknown): Result {
   const W = L.walk
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const ids = parseIds(input)
   const u = ids.length === 1 && ids[0] !== GATEWAY && work.nodes.some((n) => n.id === ids[0] && !n.down) ? ids[0] : null
   work.focus = 'topology'
   if (!u) {
     push('Type a radio on the slope, such as R2.', W.def)
+    why(WHY.needRadio())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   // Removals start before the removal: the radio is marked with its links still drawn.
   push(`${u} is about to walk out of range.`, W.move, { nodes: { [u]: 'current' } })
+  why(WHY.before(u))
   const route = currentRoute(work, work.flow)
   const node = work.nodes.find((n) => n.id === u)!
   node.down = true
   work.links = work.links.filter((l) => l.a !== u && l.b !== u)
   settle(work)
   push(`${u} is out of range of every radio.`, W.move)
+  why(WHY.gone(u))
 
   const at = route ? route.indexOf(u) : -1
   if (route && at >= 0) {
@@ -262,10 +279,12 @@ export function runWalkAway(state: SarState, input: unknown): Result {
     if (at > 0) {
       const up = route[at - 1]
       push(`${up} sends an RERR toward ${src}.`, W.rerr, { nodes: { [up]: 'current' } }, up === src ? [] : [{ kind: 'RERR', from: up, to: route[at - 2] }])
+      why(WHY.rerr(src))
     }
     for (let i = at - 1; i >= 0; i--) {
       const n = route[i]
       push(`${n} deletes its route to G, which went through ${u}.`, W.remove, { nodes: { [n]: 'dropped' } })
+      why(WHY.delete(n))
       const next = { ...work.route }
       delete next[n]
       work.route = next
@@ -279,9 +298,11 @@ export function runWalkAway(state: SarState, input: unknown): Result {
   const team = TEAM.filter((t) => work.nodes.some((n) => n.id === t && !n.down))
   if (!team.some((t) => reaches(work, t, GATEWAY))) {
     push(`${u} was an articulation point: without it the team has no path to G.`, W.cut, { nodes: { [u]: 'flagged' } })
+    why(WHY.cut(u))
     return { steps, finalSnapshot: cloneNet(work) }
   }
   push('The team can still reach G another way. Run Discover route to base again.', W.ok)
+  why(WHY.ok())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -292,7 +313,7 @@ export function runMetrics(state: SarState): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'route'
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const net = { nodes: work.nodes, links: work.links }
   const order: Relay[] = work.relay === 'mpr' ? ['mpr', 'flooding'] : ['flooding', 'mpr']
   const flows = TEAM.filter((t) => work.nodes.some((n) => n.id === t && !n.down)).map((src) => ({ src, dst: GATEWAY, packets: 5 }))
@@ -303,7 +324,7 @@ export function runMetrics(state: SarState): Result {
   pushMetricsSteps(push, 'the slope as it stands', designs, (r) => {
     if (r) work.metrics = r
     else delete work.metrics
-  })
+  }, why)
   return { steps, finalSnapshot: cloneNet(work) }
 }
 

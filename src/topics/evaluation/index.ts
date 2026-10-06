@@ -1,9 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { EvaluationCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { evaluationOperations, randomNetwork, seedNetwork } from './operations'
 import { evaluationPseudocode } from './pseudocode'
+import { story } from './story'
 import { evaluationStructure } from './structure'
 import type { EvaluationSnapshot, EvaluationState, Graph } from './types'
 
@@ -16,7 +17,7 @@ export const evaluation: TopicModule<EvaluationState, EvaluationSnapshot> = {
   operations: evaluationOperations,
   pseudocode: evaluationPseudocode,
   CanvasComponent: EvaluationCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: evaluationStructure,
   variant: {
     id: 'graph',
@@ -29,4 +30,5 @@ export const evaluation: TopicModule<EvaluationState, EvaluationSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asGraph(variant)),
   randomize: (_state, variant) => randomNetwork(asGraph(variant), newSeed()),
+  story,
 }

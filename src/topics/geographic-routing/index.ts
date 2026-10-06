@@ -1,9 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { GeoCanvas } from './canvas'
-import { coreMaterial, realWorldUsage } from './content'
+import { coreMaterial } from './content'
 import { geoOperations, randomNetwork, seedNetwork } from './operations'
 import { geoPseudocode } from './pseudocode'
+import { story } from './story'
 import { geoStructure } from './structure'
 import type { GeoSnapshot, GeoState, Recovery } from './types'
 
@@ -16,7 +17,7 @@ export const geographicRouting: TopicModule<GeoState, GeoSnapshot> = {
   operations: geoOperations,
   pseudocode: geoPseudocode,
   CanvasComponent: GeoCanvas,
-  content: { realWorldUsage, coreMaterial },
+  content: { coreMaterial },
   structure: geoStructure,
   variant: {
     id: 'recovery',
@@ -29,4 +30,5 @@ export const geographicRouting: TopicModule<GeoState, GeoSnapshot> = {
   },
   createInitialState: (variant) => seedNetwork(asRecovery(variant)),
   randomize: (_state, variant) => randomNetwork(asRecovery(variant), newSeed()),
+  story,
 }

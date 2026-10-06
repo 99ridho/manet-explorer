@@ -5,9 +5,11 @@ import type { HighlightKind, NetLink } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { Metric, QosSnapshot, QosState } from './types'
+import { WHY } from './why'
 
 type Result = OperationResult<QosSnapshot>
 type Push = ReturnType<typeof recorder<QosSnapshot>>['push']
+type Why = ReturnType<typeof recorder<QosSnapshot>>['why']
 
 /**
  * SPEC §10.10 seed: Week 7, "Jalur terpendek belum tentu memenuhi syarat" (Misra 12.8). The slide
@@ -90,13 +92,14 @@ function withEnds(s: QosSnapshot, src: string, dst: string) {
 }
 
 /** Hop count and bandwidth: breadth first over the usable links. */
-function findBfs(work: QosSnapshot, push: Push, src: string, dst: string, need: number | null) {
+function findBfs(work: QosSnapshot, push: Push, why: Why, src: string, dst: string, need: number | null) {
   const B = L.bfs
   const pruned: Record<string, HighlightKind> = {}
   const usable = work.links.filter((l) => {
     if (need === null || (l.bandwidth ?? 0) >= need) return true
     pruned[linkKey(l.a, l.b)] = 'dropped'
     push(`Link ${l.a}-${l.b} offers ${l.bandwidth} Mbps, less than ${need}, so it is not used.`, B.prune, { links: { ...pruned } })
+    why(WHY.prune(l.bandwidth ?? 0, need))
     return false
   })
   const net = { nodes: work.nodes, links: usable }
@@ -106,16 +109,19 @@ function findBfs(work: QosSnapshot, push: Push, src: string, dst: string, need: 
   while (frontier.length) {
     const v = frontier.shift()!
     push(`${v} is next: ${plural(hops.get(v)!, 'hop')} from ${src}.`, B.settle, { nodes: { [v]: 'current' }, links: { ...pruned } })
+    why(WHY.settleHop(src, dst))
     if (v === dst) {
       const path = pathTo(dst, prev)
       work.path = path
       const summary = need === null ? 'the fewest hops' : `every link offers at least ${need} Mbps`
       push(`Path ${listIds(path)}: ${plural(path.length - 1, 'hop')}, ${summary}.`, B.found, { links: treeOf(path), path })
+      why(need === null ? WHY.foundHop() : WHY.foundBandwidth())
       return
     }
     for (const n of neighbors(net, v)) {
       if (prev.has(n)) {
         push(`Going through ${v} does not improve ${n}.`, B.same, { nodes: { [v]: 'current' }, links: { ...pruned } })
+        why(WHY.sameHop(n))
         continue
       }
       prev.set(n, v)
@@ -125,14 +131,16 @@ function findBfs(work: QosSnapshot, push: Push, src: string, dst: string, need: 
         nodes: { [v]: 'current', [n]: 'new' },
         links: { ...pruned, [linkKey(v, n)]: 'active' },
       })
+      why(WHY.reachedHop(n, v))
     }
   }
   work.path = null
   push(`No path from ${src} to ${dst} meets the request.`, B.none, { links: { ...pruned } })
+  why(WHY.none())
 }
 
 /** ETX (smallest sum) and energy (largest weakest relay): a label-setting search. */
-function findBest(work: QosSnapshot, push: Push, src: string, dst: string, energy: boolean) {
+function findBest(work: QosSnapshot, push: Push, why: Why, src: string, dst: string, energy: boolean) {
   const B = L.best
   const order = work.nodes.map((n) => n.id)
   const value = new Map<string, number>([[src, energy ? Infinity : 0]])
@@ -157,11 +165,13 @@ function findBest(work: QosSnapshot, push: Push, src: string, dst: string, energ
     })
     done.add(v)
     push(`${v} is next: ${say(v, value.get(v)!)}.`, B.settle, { nodes: { [v]: 'current' } })
+    why(energy ? WHY.settleEnergy() : WHY.settleEtx())
     if (v === dst) {
       const path = pathTo(dst, prev)
       work.path = path
       const summary = energy ? `weakest relay ${weakestRelay(work, path) ?? 'none'} units` : `total ETX ${f2(pathEtx(work, path))}`
       push(`Path ${listIds(path)}: ${plural(path.length - 1, 'hop')}, ${summary}.`, B.found, { links: treeOf(path), path })
+      why(energy ? WHY.foundEnergy() : WHY.foundEtx())
       return
     }
     for (const n of neighbors(work, v)) {
@@ -174,6 +184,7 @@ function findBest(work: QosSnapshot, push: Push, src: string, dst: string, energ
       const better = !value.has(n) || (energy ? x > value.get(n)! : x < value.get(n)!)
       if (!better) {
         push(`Going through ${v} does not improve ${n}.`, B.same, { nodes: { [v]: 'current' } })
+        why(energy ? WHY.sameEnergy(n, v) : WHY.sameEtx(n, v))
         continue
       }
       value.set(n, x)
@@ -183,15 +194,17 @@ function findBest(work: QosSnapshot, push: Push, src: string, dst: string, energ
         nodes: { [v]: 'current', [n]: 'new' },
         links: { [linkKey(v, n)]: 'active' },
       })
+      why(energy ? WHY.reachedEnergy(n, v) : WHY.reachedEtx(n, v))
     }
   }
   work.path = null
   push(`No path from ${src} to ${dst} meets the request.`, B.none)
+  why(WHY.none())
 }
 
 export function runFindPath(state: QosState, input: unknown): Result {
   const work = cloneNet(state)
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const bw = work.metric === 'bandwidth'
   const req = parse(work, input, bw)
   if (!req) {
@@ -199,26 +212,29 @@ export function runFindPath(state: QosState, input: unknown): Result {
       bw ? 'Type a source and a destination, and a bandwidth in Mbps, such as A E 3.' : 'Type a source and a destination, such as A E.',
       L.bfs.def,
     )
+    why(bw ? WHY.needRequest() : WHY.needPair())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   withEnds(work, req.src, req.dst)
-  if (work.metric === 'hop' || bw) findBfs(work, push, req.src, req.dst, bw ? req.need : null)
-  else findBest(work, push, req.src, req.dst, work.metric === 'energy')
+  if (work.metric === 'hop' || bw) findBfs(work, push, why, req.src, req.dst, bw ? req.need : null)
+  else findBest(work, push, why, req.src, req.dst, work.metric === 'energy')
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
 export function runSend(state: QosState, input: unknown): Result {
   const S = L.send
   const work = cloneNet(state)
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const k = Number(input)
   if (!Number.isInteger(k) || k < 1 || k > 50) {
     push('Type a number of packets from 1 to 50.', S.def)
+    why(WHY.packets())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const path = work.path
   if (!path) {
     push('There is no path yet. Run Find path first.', S.def)
+    why(WHY.noPath())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const relays = path.slice(1, -1)
@@ -226,6 +242,7 @@ export function runSend(state: QosState, input: unknown): Result {
   for (let i = 0; i < k; i++) {
     if (relays.some((r) => work.nodes.find((n) => n.id === r)!.down)) {
       push('The path is broken. Find a new path first.', S.stop, { links: treeOf(path) })
+      why(WHY.broken())
       break
     }
     const p = work.sent + 1
@@ -247,9 +264,11 @@ export function runSend(state: QosState, input: unknown): Result {
       { links: treeOf(path), path },
       [{ kind: 'DATA', from: path[path.length - 2], to: dst, label: `${p}` }],
     )
+    why(WHY.packet())
     for (const r of out) {
       if (work.firstDown === null) work.firstDown = p
       push(`${r} runs out of battery after packet ${p}, so the path breaks.`, S.down, { nodes: { [r]: 'dropped' } })
+      why(WHY.down(r))
     }
   }
   return { steps, finalSnapshot: cloneNet(work) }

@@ -20,6 +20,7 @@ import type { HighlightKind } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { MobilitySnapshot, MobilityState, Model } from './types'
+import { WHY } from './why'
 
 type Result = OperationResult<MobilitySnapshot>
 
@@ -92,10 +93,11 @@ const one = (v: number | null) => (v === null ? null : v.toFixed(1))
 export function runAdvance(state: MobilityState, input: unknown): Result {
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const ticks = Number(input)
   if (!Number.isInteger(ticks) || ticks < 1 || ticks > 40) {
     push('Type a number of ticks from 1 to 40.', L.advance.def)
+    why(WHY.ticks())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   for (let i = 0; i < ticks; i++) {
@@ -106,6 +108,7 @@ export function runAdvance(state: MobilityState, input: unknown): Result {
       L.advance.tick,
       { links },
     )
+    why(work.model === 'rpgm' ? WHY.tickRpgm() : WHY.tickRwp())
   }
   const d = one(meanDuration(work))
   push(
@@ -114,6 +117,7 @@ export function runAdvance(state: MobilityState, input: unknown): Result {
     }, and ${one(pathAvailability(work))} % of node pairs had a path.`,
     L.advance.done,
   )
+  why(WHY.done())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -125,18 +129,21 @@ export function inMiddleHalf(p: { x: number; y: number }, area: { w: number; h: 
 export function runDensity(state: MobilityState): Result {
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const n = work.history.length
   if (n === 0) {
     push('Advance the nodes first: no positions are recorded yet.', L.density.empty)
+    why(WHY.empty())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const k = work.history.filter((p) => inMiddleHalf(p, work.area)).length
   push(`${k} of ${n} recorded positions fall in the centre quarter of the area.`, L.density.count)
+  why(WHY.count())
   push(
     `The centre quarter holds ${((100 * k) / n).toFixed(1)} % of the time spent, against 25 % for an even spread.`,
     L.density.share,
   )
+  why(WHY.share())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -168,7 +175,7 @@ export function trajectory(model: Model, seed: number, ticks: number): Topology[
 export function runMetrics(state: MobilityState): Result {
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const flows = metricsFlows(work.seed, IDS, 4, METRICS_TICKS)
   const order: Model[] = work.model === 'rwp' ? ['rwp', 'rpgm'] : ['rpgm', 'rwp']
   const designs = order.map((m) => {
@@ -178,7 +185,7 @@ export function runMetrics(state: MobilityState): Result {
   pushMetricsSteps(push, `seed ${work.seed}`, designs, (r) => {
     if (r) work.metrics = r
     else delete work.metrics
-  })
+  }, why)
   return { steps, finalSnapshot: cloneNet(work) }
 }
 

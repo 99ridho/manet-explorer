@@ -1,17 +1,5 @@
-// SPEC.md §11: generated from references/en/Week-1-Introduction.md (§2 and the {#multihop} subsections of §3).
+// SPEC.md §11: generated from references/en/Week-1-Introduction.md (the {#multihop} subsections of §3).
 // Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
-
-export const realWorldUsage = `
-A MANET is used precisely where infrastructure is missing (Loo 1.6, pp. 8-10).
-
-- **Military.** Soldiers, vehicles, and command posts that keep moving need to communicate. The network can be set up quickly without planning or infrastructure, which suits troops on the move, and fast-moving objects such as aircraft, tanks, and warships need fast and reliable communication. Loo lists reliability, efficiency, security, and multicast routing support as the requirements (p. 8).
-- **Emergency response.** A medical team at a disaster site has no time to lay cables and install network equipment. In a search-and-rescue operation, packets travel from one client device to the next until they reach a gateway. Loo notes that this can stretch a WLAN's reach from hundreds of feet to several miles, depending on how many wireless users are around (pp. 8-9, Figure 1.5). Voice dominates this traffic, so the real-time demand is high.
-- **Temporary local networks.** Sharing data in a meeting, a conference, or a classroom without an installed network (pp. 8-9).
-- **Personal area networks.** A Bluetooth piconet has 8 active devices (one master, the rest slaves), up to 255 devices in parked mode, and a typical range of 10 m, up to 100 m in ideal conditions (p. 9). A PAN centers on one person, while a WLAN serves many users; the first device in a piconet becomes the master (pp. 9-10, Figure 1.6).
-- **Community networks.** Misra chapter 1 measures open community mesh networks (Freifunk) in Berlin and Leipzig. These are not laboratory testbeds, and their shape turns out to differ from the models most studies use (section 3.2 below).
-
-Not every ad hoc node moves (Loo p. 6). Laptops and PDAs talking directly are mobile nodes; a sensor network scattered over a wide area is a *fixed ad hoc network* whose topology changes because sensors run out of power, not because they move; relay points installed temporarily where they are needed are semi-mobile.
-`.trim()
 
 export const coreMaterial = `
 ### 3.1 Networks without an access point

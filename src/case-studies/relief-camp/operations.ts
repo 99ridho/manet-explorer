@@ -10,9 +10,11 @@ import type { HighlightKind, NetHighlight } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { CampSnapshot, CampState, Focus, Mobility, Range } from './types'
+import { WHY } from './why'
 
 type Result = OperationResult<CampSnapshot>
 type Push = ReturnType<typeof recorder<CampSnapshot>>['push']
+type Why = ReturnType<typeof recorder<CampSnapshot>>['why']
 
 /** This demo's parameters (SPEC §19.2), shown in the Protocol tab. */
 export const PARAMS: MobilityParams = { area: { w: 12, h: 8 }, speed: [0.3, 0.8], pause: [0, 2], groupSpeed: 0.5, radius: 0.8 }
@@ -80,7 +82,7 @@ const view = (s: CampSnapshot, nodes: Record<string, HighlightKind> = {}, links:
 })
 
 /** Lines 2 to 13 of Elect over the nodes with an address and no head. */
-function elect(s: CampSnapshot, push?: Push) {
+function elect(s: CampSnapshot, push?: Push, why?: Why) {
   const undecided = new Set(s.nodes.filter((n) => s.address[n.id] != null && s.head[n.id] == null).map((n) => n.id))
   while (undecided.size) {
     const candidates = s.nodes
@@ -98,10 +100,12 @@ function elect(s: CampSnapshot, push?: Push) {
       L.elect.head,
       view(s, { [v]: 'found' }),
     )
+    why?.(open.length ? WHY.head(v) : WHY.headAlone(v))
     for (const n of open) {
       s.head = { ...s.head, [n]: v }
       undecided.delete(n)
       push?.(`${n} joins cluster head ${v}.`, L.elect.member, view(s, { [v]: 'found', [n]: 'new' }, { [linkKey(n, v)]: 'new' }))
+      why?.(WHY.member(n, v))
     }
   }
 }
@@ -186,13 +190,14 @@ export function runJoin(state: CampState, input: unknown): Result {
   const J = L.join
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const at = (f: Focus) => (work.focus = f)
   const parts = String(input ?? '').trim().split(/[\s,]+/).filter(Boolean)
   const [u, near] = parts
   if (parts.length !== 2 || !/^\d{1,3}$/.test(u) || work.nodes.some((n) => n.id === u) || !work.nodes.some((n) => n.id === near && !n.down)) {
     at('addresses')
     push('Type a new id and a nearby volunteer, such as 10 7.', J.def)
+    why(WHY.joinInput())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const anchor = byId(work, near)
@@ -208,11 +213,13 @@ export function runJoin(state: CampState, input: unknown): Result {
   const order = nearestFirst(work, u)
   at('addresses')
   push(`${u} arrives next to ${near} and hears ${order.length ? listIds(order) : 'no one'}.`, J.place, { nodes: { [u]: 'new' } })
+  why(WHY.arrive(u))
 
   let via: string | null = null
   for (const n of order) {
     if (work.address[n] == null || largest(work.pool[n] ?? []) <= 1) {
       push(`${n} has no spare address, so ${u} asks the next neighbor.`, J.skip, { nodes: { [n]: 'dropped', [u]: 'current' } })
+      why(WHY.skip(n))
       continue
     }
     via = n
@@ -220,14 +227,18 @@ export function runJoin(state: CampState, input: unknown): Result {
   }
   if (!via) {
     push(`No neighbor of ${u} has a spare address, so ${u} cannot join yet.`, J.wait, { nodes: { [u]: 'dropped' } })
+    why(WHY.wait(u))
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const hl = { nodes: { [via]: 'current' as HighlightKind, [u]: 'new' as HighlightKind }, links: { [linkKey(u, via)]: 'active' as HighlightKind } }
   const whole = work.pool[via].reduce((b, r) => (size(r) > size(b) ? r : b))
   push(`${via} splits ${rangeText(whole)} in half.`, J.buddy, hl)
+  why(WHY.split(via))
   const { keep, give } = split(work, via, u)
   push(`${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${u}.`, J.buddy, hl)
+  why(WHY.hand(via))
   push(`${u} takes address ${give[0]} without asking any other node.`, J.buddy, { nodes: { [u]: 'found' } })
+  why(WHY.address(u))
 
   at('clusters')
   const heads = headsInRange(work, u)
@@ -236,11 +247,13 @@ export function runJoin(state: CampState, input: unknown): Result {
     work.head = { ...work.head, [u]: h }
     computeGateways(work)
     push(`${u} joins cluster head ${h}, which it can hear.`, J.cluster, view(work, { [u]: 'new', [h]: 'found' }))
+    why(WHY.joinsHead(u, h))
   } else {
     work.head = { ...work.head, [u]: u }
     work.elections += 1
     computeGateways(work)
     push(`${u} hears no cluster head, so it becomes one.`, J.cluster, view(work, { [u]: 'found' }))
+    why(WHY.newHead(u))
   }
   return { steps, finalSnapshot: cloneNet(work) }
 }
@@ -250,22 +263,25 @@ export function runElect(state: CampState): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'clusters'
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   work.head = Object.fromEntries(work.nodes.map((n) => [n.id, null]))
   work.gateways = []
   syncRoles(work)
   if (!work.nodes.some((n) => work.address[n.id] != null)) {
     push('Every node already has a cluster head.', E.none)
+    why(WHY.noneToElect())
     return { steps, finalSnapshot: cloneNet(work) }
   }
-  elect(work, push)
+  elect(work, push, why)
   for (const n of work.nodes.map((x) => x.id).filter((n) => work.head[n] && !isHead(work, n) && headsInRange(work, n).length >= 2)) {
     work.gateways = [...work.gateways, n]
     syncRoles(work)
     push(`${n} neighbors cluster heads ${listIds(headsInRange(work, n))}, so it becomes a gateway.`, E.gateway, view(work, { [n]: 'new' }))
+    why(WHY.gateway(n))
   }
   const heads = work.nodes.filter((n) => isHead(work, n.id)).length
   push(`${plural(heads, 'cluster head')} and ${plural(work.gateways.length, 'gateway')}.`, E.done, view(work))
+  why(WHY.elected())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -303,11 +319,12 @@ export function runAdvance(state: CampState, input: unknown): Result {
   const A = L.advance
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const ticks = Number(input)
   if (!Number.isInteger(ticks) || ticks < 1 || ticks > 30) {
     work.focus = 'movement'
     push('Type a number of ticks from 1 to 30.', A.def)
+    why(WHY.ticks())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const start = work.elections
@@ -316,6 +333,7 @@ export function runAdvance(state: CampState, input: unknown): Result {
     if (lost === 0) {
       work.focus = 'movement'
       push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and every member still hears its head.`, A.calm, view(work))
+      why(WHY.calm())
     } else {
       work.focus = 'clusters'
       push(
@@ -323,10 +341,12 @@ export function runAdvance(state: CampState, input: unknown): Result {
         A.changes,
         view(work),
       )
+      why(WHY.changes())
     }
   }
   work.focus = 'clusters'
   push(`After ${plural(ticks, 'tick')} the camp elected ${plural(work.elections - start, 'new head')}.`, A.done, view(work))
+  why(WHY.done())
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -353,7 +373,7 @@ export function runMetrics(state: CampState): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'movement'
-  const { steps, push } = recorder(work)
+  const { steps, push, why } = recorder(work)
   const order: Mobility[] = work.mobility === 'rpgm' ? ['rpgm', 'rwp'] : ['rwp', 'rpgm']
   const designs = order.map((m) => {
     const topo = campTrajectory(m, work.seed, METRICS_TICKS)
@@ -365,7 +385,7 @@ export function runMetrics(state: CampState): Result {
   pushMetricsSteps(push, `seed ${work.seed}`, designs, (r) => {
     if (r) work.metrics = r
     else delete work.metrics
-  })
+  }, why)
   return { steps, finalSnapshot: cloneNet(work) }
 }
 

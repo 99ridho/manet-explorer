@@ -1,8 +1,10 @@
 import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { MeshCanvas } from './canvas'
+import { scenario } from './content'
 import { ROUTING_LABEL, meshOperations, seedNetwork } from './operations'
 import { meshPseudocode } from './pseudocode'
+import { cast } from './story'
 import { meshStructure } from './structure'
 import type { MeshSnapshot, MeshState, Routing } from './types'
 
@@ -15,7 +17,7 @@ export const meshSimulator: TopicModule<MeshState, MeshSnapshot> = {
   operations: meshOperations,
   pseudocode: meshPseudocode,
   CanvasComponent: MeshCanvas,
-  content: { realWorldUsage: '', coreMaterial: '' },
+  content: { coreMaterial: '' },
   structure: meshStructure,
   variant: {
     id: 'routing',
@@ -29,4 +31,5 @@ export const meshSimulator: TopicModule<MeshState, MeshSnapshot> = {
   createInitialState: (variant) => seedNetwork(asRouting(variant)),
   // A fresh seed redraws the retries; the mesh and its delivery ratios stay.
   randomize: (_state, variant) => seedNetwork(asRouting(variant), newSeed()),
+  story: { scenario, cast },
 }

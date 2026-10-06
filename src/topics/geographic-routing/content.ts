@@ -1,15 +1,5 @@
-// SPEC.md §11: generated from references/en/Week-3-Broadcast-Multicast-Geographic.md (§2 and the {#geographic-routing} subsections of §3).
+// SPEC.md §11: generated from references/en/Week-3-Broadcast-Multicast-Geographic.md (the {#geographic-routing} subsections of §3).
 // Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
-
-export const realWorldUsage = `
-Broadcast is the basis of communication in an ad hoc network, route discovery included (Misra chapter 6).
-
-The radio makes broadcast expensive (Misra p. 99). A transmission reaches only the nodes in range, so a message still has to be forwarded (the medium is *semi-broadcast*); one transmission uses bandwidth up to twice the transmission range (the *interference area*); and bandwidth, processing power, and energy are far smaller than on a wired network. As a result, counting retransmissions matters much more here than on a wired network.
-
-Multicast sends one data stream to a group of receivers. The wired protocols (PIM, DVMRP, CBT, MOSPF) were designed for wired networks and do not handle what a MANET brings: no infrastructure, the semi-broadcast medium, radio interference, limited resources, fast topology change, and mobility (Misra pp. 98-99).
-
-Geographic routing uses node positions instead of routing tables. Geocast delivers to every node inside a region, and it is widely used to spread queries in sensor networks (Misra pp. 173-177).
-`.trim()
 
 export const coreMaterial = `
 ### 3.3 Routing with coordinates
