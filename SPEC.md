@@ -1402,16 +1402,16 @@ The tracker for every module. A row reaches **Specified** only when its full Sec
 | Module | Week(s) | English reference | Spec | Code |
 |---|---|---|---|---|
 | `multihop` | 1 | reviewed | Specified, 10.1 | Implemented |
-| `proactive-routing` | 2 | reviewed | Specified, 10.2 | not started |
+| `proactive-routing` | 2 | reviewed | Specified, 10.2 | Implemented |
 | `reactive-routing` | 2 | reviewed | Specified, 10.3 | Implemented |
 | `broadcast` | 3 | reviewed | Specified, 10.4 | Implemented |
 | `geographic-routing` | 3 | reviewed | Specified, 10.5 | Implemented |
 | `clustering` | 4 | reviewed | Specified, 10.6 | Implemented |
 | `address-allocation` | 4 | reviewed | Specified, 10.7 | Implemented |
-| `mobility` | 5 | draft | Specified, 10.8 | not started |
-| `evaluation` | 6 | draft | Specified, 10.9 | not started |
-| `qos-routing` | 7 | draft | Specified, 10.10 | not started |
-| `routing-attacks` | 8 | draft | Specified, 10.11 | not started |
+| `mobility` | 5 | reviewed | Specified, 10.8 | not started |
+| `evaluation` | 6 | reviewed | Specified, 10.9 | not started |
+| `qos-routing` | 7 | reviewed | Specified, 10.10 | not started |
+| `routing-attacks` | 8 | reviewed | Specified, 10.11 | not started |
 | Case study `sar-slope` | 1–3 | uses Weeks 1–3 | Specified, 19.1 | not started |
 | Case study `relief-camp` | 4–6 | uses Weeks 4–6 | Specified, 19.2 | not started |
 | Case study `community-mesh` | 7–8 | uses Weeks 7–8 | Specified, 19.3 | not started |

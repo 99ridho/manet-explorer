@@ -3,6 +3,8 @@
 // Break link on a route) are covered by each topic's own operations.test.ts.
 export const INPUTS: Record<string, unknown[]> = {
   'multihop/link-etx': ['C D 0.8 0.5', 'C D 0 0.5', 'A D 0.8 0.5', 'C D 2 0.5', 'nonsense'],
+  'proactive-routing/advertise': ['M4', 'M2', 'X9', ''],
+  'proactive-routing/move': ['M3 M6', 'M1 M5', 'M3', 'M3 M3'],
   'reactive-routing/discover-aodv': ['S D', 'S', 'S S'],
   'reactive-routing/discover-dsr': ['S D', 'X Y'],
   'reactive-routing/send-aodv': ['S D', 'bad'],

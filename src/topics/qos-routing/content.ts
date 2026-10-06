@@ -1,35 +1,7 @@
----
-week: 7
-title: QoS, Delay, Congestion, and Energy
-source: references/id/minggu-07.md
-status: reviewed
-books:
-  - Misra, Woungang & Misra (2009), Guide to Wireless Ad Hoc Networks, chapters 4, 12, 13, and 15
-  - Loo, Lloret & Ortiz (2012), Mobile Ad Hoc Networks, chapter 8
----
+// SPEC.md §11: generated from references/en/Week-7-QoS-Congestion-Energy.md (§2 and the {#qos-routing} subsections of §3).
+// Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
 
-# Week 7: QoS, Delay, Congestion, and Energy
-
-Course: Integrasi Jaringan Mandiri/Mobile, Universitas Negeri Jakarta
-Lecturer: Muhammad Ridho Kurniawan Pratama, M.T.I.
-
-Translated from the Week 7 slides. Every claim carries the book and page the slide cites. This file is a draft until the lecturer reviews it (SPEC.md Section 11).
-
----
-
-## 1. Learning Outcomes
-
-After this week, a student can:
-
-- Explain what QoS promises and why a MANET makes those promises hard to keep.
-- Compare IntServ, DiffServ, and the MANET-specific QoS models, and explain QoS routing.
-- Explain why TCP misreads loss in a MANET and why ETX beats hop count.
-- Tell minimum total energy apart from maximum network lifetime.
-
----
-
-## 2. Real-World Usage
-
+export const realWorldUsage = `
 QoS means a network promises a certain level of service. In a MANET, almost everything that promise rests on keeps changing (Misra chapter 12).
 
 Some limits are concrete (Misra chapter 13, p. 311; chapter 4, p. 87). For telephony, the upper bound on one-way delay is 400 ms, within a range of 25 to 400 ms that depends on the voice quality wanted and on echo cancellation. For highly interactive applications such as IP telephony, an end-to-end delay below 150 ms is not noticed by the listener (Misra pp. 283-284). Network activity takes about 10 % of a laptop's power and up to 50 % on a handheld device, from a 1998 experiment by Kravets and Krishnan; devices differ now, but networking still takes a large share of a small device's energy.
@@ -37,12 +9,10 @@ Some limits are concrete (Misra chapter 13, p. 311; chapter 4, p. 87). For telep
 On a wired network a lost packet almost always means a full queue. On a wireless multihop network it often does not, and TCP pays for the confusion (Misra chapter 15).
 
 Without infrastructure, energy directly limits network performance (Loo chapter 8).
+`.trim()
 
----
-
-## 3. Core Material
-
-### 3.1 Promising service without guarantees {#qos-routing}
+export const coreMaterial = `
+### 3.1 Promising service without guarantees
 
 **What is promised** (Misra pp. 282-284): minimum bandwidth and maximum acceptable delay; *jitter*, the variation in delay between packets caused by changing queues at each node; and the maximum tolerated packet loss rate.
 
@@ -81,7 +51,7 @@ Many QoS routing problems are NP-complete, so they call for heuristics that load
 
 (Misra 12.8.1, pp. 299-300, Figure 12.10.) Truly hard QoS guarantees are possible only on wired networks. Misra also groups protocols as *coupled* or *decoupled* from the QoS provisioning mechanism (pp. 300-301).
 
-### 3.2 Delay and congestion, misunderstood {#qos-routing}
+### 3.2 Delay and congestion, misunderstood
 
 **Controlling delay** (Misra 13.1, p. 311). On 802.11, bandwidth is much narrower than on a comparable wired network; the channel's error behavior and capacity keep changing, so hard guarantees are nearly impossible; and user movement causes fading, so quality can drop fast. The chapter therefore adapts the application's service class with feedback control instead of promising fixed numbers.
 
@@ -104,7 +74,7 @@ Many QoS routing problems are NP-complete, so they call for heuristics that load
 
 **Choosing an approach** (Misra 15.6.1, p. 370). A mobile network is prone to false alarms, so it needs control messages such as ELFN. In a static network, breaks from distance are rare, and link-quality-aware routing is enough, so standard TCP can be used without much change. Misra also calls for standardizing the flow of control information from the routing layer to TCP, because MANET routing protocols vary so much.
 
-### 3.3 Energy-aware routing {#qos-routing}
+### 3.3 Energy-aware routing
 
 **Two goals** (Loo p. 203). *Total energy*: minimize all the energy used for one communication task. *Network lifetime*: maximize the time until the first node runs out of power. Both look for a path that minimizes some energy-related cost. The difference matters: the path with the lowest total energy can drain one critical node faster.
 
@@ -113,17 +83,4 @@ Many QoS routing problems are NP-complete, so they call for heuristics that load
 **Single cost and multicost** (Loo 8.1 and 8.3, pp. 202-210). A single-cost scheme gives each link one scalar metric, possibly a combination of load, energy, and interference, usually yields one path per node pair, and struggles to support QoS differentiation. A multicost scheme gives each link a vector of cost parameters, collects the non-dominated candidate paths, and picks the best with an optimization function; Loo's results show more balanced energy use. A path's cost is computed by applying an associative operator to each component of the links' cost vectors, and the optimal path minimizes the optimization function. Finding a path with two or more cost constraints is generally NP-complete, so existing algorithms use heuristics and polynomial-time approximations, and multicost problems are less studied in wireless networks even though their energy constraints are real (Loo p. 204).
 
 **Energy-efficient broadcast and multicast** (Loo 8.2.2, pp. 204-206). Augmentation algorithms start from an empty set and grow it into a tree: MST and SPT (the minimum-energy spanning tree and the shortest-path tree via Dijkstra); BIP adds one node at a time, the one with the smallest added cost; BAIP adds several at once; GPBE uses new nodes per unit of power. Local search algorithms improve an existing tree step by step: *Sweep* removes transmissions made unnecessary by the broadcast nature of radio; *EWMA* and *LESS* raise one node's power if that lets other nodes stop transmitting; *r-shrink* shrinks each node's radius until fewer than r nodes hear it. They stop when no further improvement is found, and most assume transmit power can be adjusted.
-
----
-
-## 4. Summary
-
-| Idea | Core point |
-|---|---|
-| QoS is a promise | Bandwidth, delay, jitter, and loss all change in a MANET |
-| Soft state | Reservations are refreshed by traffic, not locked for the session |
-| False alarms | A lost packet in a MANET does not always mean a full queue |
-| ETX | Link quality beats hop count as a metric |
-| Energy | Minimum total energy and network lifetime are two different goals |
-
-Week 8 adds one more layer: what happens when some nodes lie on purpose, and how a node decides whom to trust.
+`.trim()

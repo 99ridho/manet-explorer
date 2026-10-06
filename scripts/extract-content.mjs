@@ -5,11 +5,16 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 // Registered topics only; add a row when a topic joins src/topics/registry.ts.
 const topics = [
   ['multihop', 'Week-1-Introduction.md'],
+  ['proactive-routing', 'Week-2-Routing.md'],
   ['reactive-routing', 'Week-2-Routing.md'],
   ['broadcast', 'Week-3-Broadcast-Multicast-Geographic.md'],
   ['geographic-routing', 'Week-3-Broadcast-Multicast-Geographic.md'],
   ['clustering', 'Week-4-Self-Organization.md'],
   ['address-allocation', 'Week-4-Self-Organization.md'],
+  ['mobility', 'Week-5-Mobility-Propagation.md'],
+  ['evaluation', 'Week-6-Modeling-Simulation.md'],
+  ['qos-routing', 'Week-7-QoS-Congestion-Energy.md'],
+  ['routing-attacks', 'Week-8-Security-Trust.md'],
 ]
 
 function frontmatter(md, file) {

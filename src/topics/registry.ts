@@ -1,6 +1,7 @@
 // Single source of truth for navigation and routes (SPEC.md §7.4). Registry order is week order.
 import type { TopicModule } from '@/types/step-engine'
 import { multihop } from './multihop'
+import { proactiveRouting } from './proactive-routing'
 import { reactiveRouting } from './reactive-routing'
 import { broadcast } from './broadcast'
 import { geographicRouting } from './geographic-routing'
@@ -10,6 +11,7 @@ import { addressAllocation } from './address-allocation'
 // Cast: each module is strongly typed internally; the registry erases those params.
 export const topics: TopicModule[] = [
   multihop as unknown as TopicModule,
+  proactiveRouting as unknown as TopicModule,
   reactiveRouting as unknown as TopicModule,
   broadcast as unknown as TopicModule,
   geographicRouting as unknown as TopicModule,

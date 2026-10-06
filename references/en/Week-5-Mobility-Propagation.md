@@ -2,7 +2,7 @@
 week: 5
 title: Mobility and Radio Propagation
 source: references/id/minggu-05.md
-status: draft
+status: reviewed
 books:
   - Misra, Woungang & Misra (2009), Guide to Wireless Ad Hoc Networks, chapters 9, 10, and 11
 ---

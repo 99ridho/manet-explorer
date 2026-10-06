@@ -74,6 +74,18 @@ test.describe('desktop (lg)', () => {
     expect((await documentScroll(page)).scrollHeight).toBe(doc.clientHeight)
   })
 
+  // Topics whose canvas card carries more than the network (a routing table, a bar chart).
+  for (const [slug, operation, input] of [['proactive-routing', /move node/i, 'M3 M6']] as const) {
+    test(`${slug}: the page still does not scroll`, async ({ page }) => {
+      await openOperation(page, slug, operation)
+      if (input) await page.getByRole('textbox').fill(input)
+      await page.getByRole('button', { name: 'Go', exact: true }).click()
+      await expect(page.locator('[aria-current="step"]').first()).toBeVisible()
+      const doc = await documentScroll(page)
+      expect(doc.scrollHeight).toBe(doc.clientHeight)
+    })
+  }
+
   test('scrolling those regions leaves the rest of the layout in place', async ({ page }) => {
     await discover(page)
     const fixed = () =>
@@ -205,6 +217,7 @@ test.describe('phone', () => {
   })
 
   for (const [slug, operation, input] of [
+    ['proactive-routing', /move node/i, 'M3 M6'],
     ['broadcast', /select mprs/i, 'A'],
     ['geographic-routing', /route/i, 'S D'],
     ['clustering', /elect/i, null],

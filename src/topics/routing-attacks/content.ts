@@ -1,45 +1,16 @@
----
-week: 8
-title: Security and Trust
-source: references/id/minggu-08.md
-status: reviewed
-books:
-  - Misra, Woungang & Misra (2009), Guide to Wireless Ad Hoc Networks, chapters 17, 18, and 19
----
+// SPEC.md §11: generated from references/en/Week-8-Security-Trust.md (§2 and the {#routing-attacks} subsections of §3).
+// Do not edit: regenerate with `node scripts/extract-content.mjs` after the reference changes.
 
-# Week 8: Security and Trust
-
-Course: Integrasi Jaringan Mandiri/Mobile, Universitas Negeri Jakarta
-Lecturer: Muhammad Ridho Kurniawan Pratama, M.T.I.
-
-Translated from the Week 8 slides, Parts 1 and 2. Part 3 of the slides is the final project brief, which is outside this explorer's scope (SPEC.md Section 2); only its security measurement plan (section 2 below) and its eight-week summary (section 4) are kept, because they close the lecture material. Every claim carries the book and page the slide cites. This file is a draft until the lecturer reviews it (SPEC.md Section 11).
-
----
-
-## 1. Learning Outcomes
-
-After this week, a student can:
-
-- Describe routing attacks from their elements: sinking, rushing, spoofing, replay, and modification.
-- Explain the black hole, gray hole, and wormhole attacks.
-- Compare anomaly-based and misuse-based detection, and explain the watchdog and its limits.
-- Describe the parts of a trust system and the decisions it makes.
-
----
-
-## 2. Real-World Usage
-
+export const realWorldUsage = `
 The routing protocols of Weeks 2 and 3 assume every node is honest. Attackers exploit that assumption (Misra chapter 18).
 
 Prevention alone is not enough. Nodes must detect misbehavior and decide whom to trust (Misra chapters 17 and 19).
 
 The security project direction in the course asks students to run the same scenario with and without attacking nodes and to measure the drop in packet delivery ratio, the rise in delay, and the change in control overhead, then to add a detection mechanism and measure how much of the loss it recovers. A reference figure from Misra (p. 445): the watchdog and pathrater raise throughput by 17 % when 40 % of nodes misbehave, at an overhead of 9 to 17 percent.
+`.trim()
 
----
-
-## 3. Core Material
-
-### 3.1 Attacks on routing {#routing-attacks}
+export const coreMaterial = `
+### 3.1 Attacks on routing
 
 **Attack elements** (Misra Figure 18.1). Misra divides attacks into three levels: scenario, behavior, and element. Common elements:
 
@@ -66,7 +37,7 @@ Detecting a partition statistically is actually easy, but the attacker can hide 
 
 **Threat analysis in three stages** (Misra 18.5, pp. 463-464), with OLSR as the example: study the implementation (how malicious information spreads and how far each message type reaches); derive the cause and effect between attack behavior and the disruption it causes; and assess the risk of each routing message type from those findings. Students can use this framework to analyze their chosen protocol in the final project, not only to measure the performance drop.
 
-### 3.2 Detection and trust {#routing-attacks}
+### 3.2 Detection and trust
 
 **Intrusion detection** (Misra 17.2, pp. 428-429). *Anomaly-based* detection models normal behavior and treats deviation as intrusion; it can detect attacks not seen before, but false positives can be high. *Misuse-based* (signature) detection matches activity against attack signatures; it is efficient with few false positives, but it cannot detect new attacks and its signature database needs frequent updates. A third approach, *specification-based*, detects violations of the protocol specification and has been applied to many MANET routing protocols, AODV included (p. 436).
 
@@ -81,17 +52,4 @@ Detecting a partition statistically is actually easy, but the attacker can hide 
 **Kinds of evidence** (Misra pp. 479-480). *Hard evidence* is credentials such as digital certificates, evaluated with cryptography, with a simple policy (the identity matches or it does not); it suits organizations with a central authority. *Soft evidence* is observed behavior, gathered by passive monitoring, acknowledgments, or IDS; it can handle new kinds of attack without changing the protocol, but needs a mathematical model to turn it into opinion. Because a MANET has no hierarchy or central authority, its trust systems are almost always decentralized and installed in every node.
 
 **Trust decisions** (Misra p. 480). A node decides whether to accept or reject a newly discovered route and which path to use; whether to send or forward packets on behalf of other nodes; and whether to accept or ignore a recommendation, and whether to warn other nodes. The mathematical models vary: graph-based, entropy-based, and Bayesian. Recommendations between nodes create indirect relationships without a higher authority.
-
----
-
-## 4. Summary
-
-| Weeks | What carries into the project |
-|---|---|
-| 1-2 | A MANET has no infrastructure; routes are built proactively, reactively, or hybrid |
-| 3-4 | Frugal broadcast, multicast, positions, clusters, and node cooperation |
-| 5-6 | Mobility and propagation models, simulators, and evaluation metrics |
-| 7 | QoS, delay, congestion, and energy efficiency |
-| 8 | Attacks, detection, and trust as the last layer |
-
-The final project asks for two things at once: a clear question and a methodology that others can check.
+`.trim()
