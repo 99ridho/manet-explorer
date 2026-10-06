@@ -1,4 +1,8 @@
 // SPEC.md §8 and §19.0: topic nav grouped by week range, then the case studies, driven by the registries.
+// The shadcn menu button has a fixed h-8; titles that wrap need the row to grow with them, and the
+// badge keeps its width so the title takes the wrapping.
+const ITEM = 'h-auto min-h-8 justify-between py-1.5 leading-snug'
+const BADGE = 'shrink-0 font-mono text-[10px]'
 import { NavLink } from 'react-router'
 import {
   Sidebar,
@@ -37,9 +41,9 @@ export function AppSidebar() {
                   <SidebarMenuItem key={topic.slug}>
                     <NavLink to={`/topic/${topic.slug}`}>
                       {({ isActive }) => (
-                        <SidebarMenuButton isActive={isActive} className="justify-between">
+                        <SidebarMenuButton isActive={isActive} className={ITEM}>
                           <span>{topic.title}</span>
-                          <Badge className="font-mono text-[10px]">
+                          <Badge className={BADGE}>
                             {topic.weekLabel}
                           </Badge>
                         </SidebarMenuButton>
@@ -60,9 +64,9 @@ export function AppSidebar() {
                 <SidebarMenuItem key={cs.slug}>
                   <NavLink to={`/case-study/${cs.slug}`}>
                     {({ isActive }) => (
-                      <SidebarMenuButton isActive={isActive} className="justify-between">
+                      <SidebarMenuButton isActive={isActive} className={ITEM}>
                         <span>{cs.title}</span>
-                        <Badge className="font-mono text-[10px]">{cs.weekLabel}</Badge>
+                        <Badge className={BADGE}>{cs.weekLabel}</Badge>
                       </SidebarMenuButton>
                     )}
                   </NavLink>

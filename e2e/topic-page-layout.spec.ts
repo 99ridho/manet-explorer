@@ -91,6 +91,16 @@ test.describe('desktop (lg)', () => {
     })
   }
 
+  test('every sidebar entry shows its whole title, the selected one included', async ({ page }) => {
+    await page.goto('/topic/qos-routing')
+    await expect(card(page, 'Operation')).toBeVisible()
+    const clipped = await page.locator('[data-sidebar="menu-button"]').evaluateAll((els) =>
+      els.filter((el) => el.scrollHeight > el.clientHeight + 1).map((el) => el.textContent),
+    )
+    expect(clipped).toEqual([])
+    await expect(page.locator('[data-sidebar="menu-button"][data-active="true"]')).toContainText('QoS, ETX, and Energy-Aware Routing')
+  })
+
   test('scrolling those regions leaves the rest of the layout in place', async ({ page }) => {
     await discover(page)
     const fixed = () =>
