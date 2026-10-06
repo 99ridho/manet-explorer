@@ -10,6 +10,7 @@ import { addressAllocation } from './address-allocation'
 import { mobility } from './mobility'
 import { evaluation } from './evaluation'
 import { qosRouting } from './qos-routing'
+import { routingAttacks } from './routing-attacks'
 
 // Cast: each module is strongly typed internally; the registry erases those params.
 export const topics: TopicModule[] = [
@@ -23,6 +24,7 @@ export const topics: TopicModule[] = [
   mobility as unknown as TopicModule,
   evaluation as unknown as TopicModule,
   qosRouting as unknown as TopicModule,
+  routingAttacks as unknown as TopicModule,
 ]
 
 export function getTopic(slug: string | undefined): TopicModule | undefined {

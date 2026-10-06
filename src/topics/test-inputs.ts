@@ -29,4 +29,6 @@ export const INPUTS: Record<string, unknown[]> = {
   'qos-routing/path-energy': ['A E', 'B D'],
   'qos-routing/path-hop': ['A E', 'E E'],
   'qos-routing/send': [5, 0, 51],
+  'routing-attacks/send': [3, 0, 21],
+  'routing-attacks/watchdog': [5, 21],
 }

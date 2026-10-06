@@ -230,6 +230,7 @@ test.describe('phone', () => {
     ['mobility', /metrics run/i, null],
     ['evaluation', /metrics over seeds/i, '10'],
     ['qos-routing', /find path/i, 'A E 3'],
+    ['routing-attacks', /discover route/i, null],
   ] as const) {
     test(`${slug}: a seed run fits the width`, async ({ page }) => {
       await openOperation(page, slug, operation)

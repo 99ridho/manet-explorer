@@ -1411,7 +1411,7 @@ The tracker for every module. A row reaches **Specified** only when its full Sec
 | `mobility` | 5 | reviewed | Specified, 10.8 | Implemented |
 | `evaluation` | 6 | reviewed | Specified, 10.9 | Implemented |
 | `qos-routing` | 7 | reviewed | Specified, 10.10 | Implemented |
-| `routing-attacks` | 8 | reviewed | Specified, 10.11 | not started |
+| `routing-attacks` | 8 | reviewed | Specified, 10.11 | Implemented |
 | Case study `sar-slope` | 1–3 | uses Weeks 1–3 | Specified, 19.1 | not started |
 | Case study `relief-camp` | 4–6 | uses Weeks 4–6 | Specified, 19.2 | not started |
 | Case study `community-mesh` | 7–8 | uses Weeks 7–8 | Specified, 19.3 | not started |
