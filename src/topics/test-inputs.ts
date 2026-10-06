@@ -24,4 +24,9 @@ export const INPUTS: Record<string, unknown[]> = {
   'mobility/advance-rwp': [3, 0, 41],
   'mobility/advance-rpgm': [3, 2.5],
   'evaluation/metrics': [3, 0, 11],
+  'qos-routing/path-bandwidth': ['A E 3', 'A E 7', 'A E', 'A E x'],
+  'qos-routing/path-etx': ['A E', 'A'],
+  'qos-routing/path-energy': ['A E', 'B D'],
+  'qos-routing/path-hop': ['A E', 'E E'],
+  'qos-routing/send': [5, 0, 51],
 }

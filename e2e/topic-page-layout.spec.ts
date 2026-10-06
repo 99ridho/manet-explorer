@@ -79,6 +79,7 @@ test.describe('desktop (lg)', () => {
     ['proactive-routing', /move node/i, 'M3 M6'],
     ['mobility', /metrics run/i, null],
     ['evaluation', /metrics over seeds/i, '10'],
+    ['qos-routing', /find path/i, 'A E 3'],
   ] as const) {
     test(`${slug}: the page still does not scroll`, async ({ page }) => {
       await openOperation(page, slug, operation)
@@ -228,6 +229,7 @@ test.describe('phone', () => {
     ['address-allocation', /merge partition/i, null],
     ['mobility', /metrics run/i, null],
     ['evaluation', /metrics over seeds/i, '10'],
+    ['qos-routing', /find path/i, 'A E 3'],
   ] as const) {
     test(`${slug}: a seed run fits the width`, async ({ page }) => {
       await openOperation(page, slug, operation)
