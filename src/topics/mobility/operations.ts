@@ -175,7 +175,7 @@ export function runMetrics(state: MobilityState): Result {
     const topo = trajectory(m, work.seed, METRICS_TICKS)
     return { label: MODEL_LABEL[m], runs: flows.map((f) => runFlow(f, { ticks: METRICS_TICKS, topologyAt: (t) => topo[t] })) }
   })
-  pushMetricsSteps(push, work.seed, designs, (r) => {
+  pushMetricsSteps(push, `seed ${work.seed}`, designs, (r) => {
     if (r) work.metrics = r
     else delete work.metrics
   })

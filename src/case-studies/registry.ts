@@ -1,8 +1,9 @@
 // SPEC.md §19.0: case studies in week order. Each simulator is a TopicModule kept out of `topics`.
-// None is built yet (SPEC §15), so the sidebar and home page hide the group while this is empty.
 import type { CaseStudyModule } from '@/types/case-study'
+import { sarSlope } from './sar-slope'
 
-export const caseStudies: CaseStudyModule[] = []
+// Cast: each module is strongly typed internally; the registry erases the snapshot param.
+export const caseStudies: CaseStudyModule[] = [sarSlope as unknown as CaseStudyModule]
 
 export function getCaseStudy(slug: string | undefined): CaseStudyModule | undefined {
   return caseStudies.find((c) => c.slug === slug)

@@ -1,6 +1,7 @@
 // SPEC.md §9.1: every declared metrics run, pinned on its seed. A change to the model shows up here
 // as a failing number, never as a silent drift.
 import { describe, expect, it } from 'vitest'
+import { runDiscover as sarDiscover, runMetrics as sarMetrics, seedNetwork as sarSeed } from '@/case-studies/sar-slope/operations'
 import { runMetrics as evaluationMetrics, seedNetwork as evaluationSeed } from '@/topics/evaluation/operations'
 import { runMetrics as mobilityMetrics, seedNetwork as mobilitySeed } from '@/topics/mobility/operations'
 
@@ -59,5 +60,22 @@ describe('evaluation, seeds 1 to 10', () => {
     expect(evaluationMetrics(evaluationSeed(), 11).steps).toEqual([
       expect.objectContaining({ highlightLine: 1, description: 'Type a number of seeds from 1 to 10.' }),
     ])
+  })
+})
+
+describe('sar-slope, the seed slope', () => {
+  const { steps } = sarMetrics(sarSeed('mpr'))
+
+  it('delivers every report under both designs; the overhead differs', () => {
+    expect(steps.at(-1)?.description).toBe('On the slope as it stands, MPR relaying delivers 100.0 % and Blind flooding delivers 100.0 %.')
+    expect(steps.at(-1)?.snapshot.metrics?.groups.map((g) => g.labels)).toEqual([
+      ['100.0', '100.0'],
+      ['14.0', '14.0'],
+      ['2.13', '2.67'],
+    ])
+  })
+
+  it('does not depend on a discovery run first', () => {
+    expect(sarMetrics(sarDiscover(sarSeed('mpr'), 'T1').finalSnapshot).steps.at(-1)?.description).toBe(steps.at(-1)?.description)
   })
 })

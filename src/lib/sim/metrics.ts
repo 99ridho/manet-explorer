@@ -83,7 +83,8 @@ type Push = (description: string, line: number, highlight?: NetSnapshot['highlig
  */
 export function pushMetricsSteps(
   push: Push,
-  seed: number,
+  scope: string, // "seed 5", or what the run is over when nothing is random
+
   designs: { label: string; runs: FlowRun[] }[],
   setResult: (r: MetricsResult | undefined) => void,
 ) {
@@ -101,10 +102,10 @@ export function pushMetricsSteps(
     })
     summaries.push(summarize(d.runs))
   }
-  setResult({ caption: `Computed by this simulator on seed ${seed}.`, designs: designs.map((d) => d.label), groups: summaryGroups(summaries) })
+  setResult({ caption: `Computed by this simulator on ${scope}.`, designs: designs.map((d) => d.label), groups: summaryGroups(summaries) })
   const [a, b] = designs
   push(
-    `On seed ${seed}, ${a.label} delivers ${fmtPdr(summaries[0].pdr)} % and ${b.label} delivers ${fmtPdr(summaries[1].pdr)} %.`,
+    `On ${scope}, ${a.label} delivers ${fmtPdr(summaries[0].pdr)} % and ${b.label} delivers ${fmtPdr(summaries[1].pdr)} %.`,
     ML.result,
   )
   setResult(undefined)

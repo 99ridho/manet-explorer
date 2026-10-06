@@ -31,4 +31,8 @@ export const INPUTS: Record<string, unknown[]> = {
   'qos-routing/send': [5, 0, 51],
   'routing-attacks/send': [3, 0, 21],
   'routing-attacks/watchdog': [5, 21],
+  'sar-slope/discover-mpr': ['T1', 'T3', 'R1'],
+  'sar-slope/discover-flooding': ['T2', ''],
+  'sar-slope/send': ['T1', 'X'],
+  'sar-slope/walk-away': ['R2', 'R5', 'G', 'X'],
 }
