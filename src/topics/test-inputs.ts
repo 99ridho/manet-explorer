@@ -37,4 +37,5 @@ export const INPUTS: Record<string, unknown[]> = {
   'sar-slope/walk-away': ['R2', 'R5', 'G', 'X'],
   'relief-camp/join': ['10 1', '10 7', '9 1', 'x'],
   'relief-camp/advance': [5, 31],
+  'community-mesh/deliver': [5, 0, 31],
 }

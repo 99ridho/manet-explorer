@@ -1,5 +1,6 @@
 // SPEC.md §10.11: DSR-style discovery under a black hole or a wormhole, sending, and the watchdog.
-import { cloneNet, findLink, linkKey, listIds, makeLink, neighbors, recorder } from '@/lib/net'
+import { floodRreq } from '@/lib/dsr-flood'
+import { cloneNet, findLink, linkKey, listIds, makeLink, recorder } from '@/lib/net'
 import type { HighlightKind } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
@@ -66,7 +67,6 @@ export function seedNetwork(attacker: Attacker = 'blackhole'): AttackSnapshot {
 const isBlackHole = (s: AttackSnapshot, id: string) => s.attacker === 'blackhole' && id === 'M'
 const farEnd = (s: AttackSnapshot, id: string) => (s.attacker !== 'wormhole' ? null : id === 'M1' ? 'M2' : id === 'M2' ? 'M1' : null)
 const tree = (route: string[]) => Object.fromEntries(route.slice(1).map((n, i) => [linkKey(route[i], n), 'tree' as HighlightKind]))
-const hearVerb = (ids: string[]) => (ids.length === 1 ? 'hears' : 'hear')
 
 export function runDiscover(state: AttackState): Result {
   const D = L.discover
@@ -74,62 +74,8 @@ export function runDiscover(state: AttackState): Result {
   work.routes = []
   work.route = null
   const { steps, push } = recorder(work)
-  const seen = new Set([SRC])
-  let heard: [string, string[]][] = [[SRC, [SRC]]]
-  const pending: { at: number; route: string[] }[] = []
-  for (let t = 1; heard.length || pending.length; t++) {
-    const next: [string, string[]][] = []
-    const copies: [string, string[]][] = [] // copies that reach the destination this tick
-    for (const [v, record] of heard) {
-      if (v === DST || isBlackHole(work, v)) continue
-      for (const n of neighbors(work, v)) {
-        if (n === DST) copies.push([n, [...record, n]])
-        else if (!seen.has(n)) {
-          seen.add(n)
-          next.push([n, [...record, n]])
-        }
-      }
-    }
-    const acting = [...next, ...copies]
-    if (acting.length) {
-      const ids = [...new Set(acting.map(([n]) => n))]
-      push(`Tick ${t}: ${listIds(ids)} ${hearVerb(ids)} the RREQ.`, D.tick, {
-        nodes: Object.fromEntries(ids.map((n) => [n, 'current' as HighlightKind])),
-      })
-    }
-    for (const [n, record] of next) {
-      if (isBlackHole(work, n)) {
-        const fake = [...record, DST]
-        pending.push({ at: t + record.length - 1, route: fake })
-        push(`${n} answers at once, claiming a route ${listIds(fake)} it does not have.`, D.blackHole, { nodes: { [n]: 'flagged' } }, [
-          { kind: 'RREP', from: n, to: record[record.length - 2] },
-        ])
-      }
-      const far = farEnd(work, n)
-      if (far && !seen.has(far)) {
-        seen.add(far)
-        next.push([far, [...record, far]])
-        push(
-          `${n} passes the RREQ through the tunnel, and ${far} replays it next to ${listIds(neighbors(work, far))}.`,
-          D.tunnel,
-          { links: { [linkKey(n, far)]: 'active' } },
-          [{ kind: 'RREQ', from: n, to: far }],
-        )
-      }
-    }
-    for (const [, record] of copies) {
-      pending.push({ at: t + record.length - 1, route: record })
-      push(`${DST} receives the record ${listIds(record)} and answers.`, D.dest, { nodes: { [DST]: 'found' } })
-    }
-    for (const r of pending.filter((p) => p.at === t)) {
-      work.routes.push(r.route)
-      push(`An RREP with ${listIds(r.route)} reaches ${SRC} at tick ${t}.`, D.arrival, { nodes: { [SRC]: 'current' } }, [
-        { kind: 'RREP', from: r.route[1], to: SRC },
-      ])
-    }
-    for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at === t) pending.splice(i, 1)
-    heard = next
-  }
+  const rules = { blackHole: (id: string) => isBlackHole(work, id), farEnd: (id: string) => farEnd(work, id) }
+  work.routes = floodRreq(work, SRC, DST, rules, push, D).routes
   if (work.routes.length === 0) {
     push(`No RREP reached ${SRC}, so there is no route to ${DST}.`, D.pick)
     return { steps, finalSnapshot: cloneNet(work) }

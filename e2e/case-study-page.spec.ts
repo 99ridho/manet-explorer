@@ -3,7 +3,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
 const ACTIVE_PANEL = 'section[aria-label="Case study materials"] [role="tabpanel"][data-state="active"]'
-const SLUGS = ['sar-slope', 'relief-camp']
+const SLUGS = ['sar-slope', 'relief-camp', 'community-mesh']
 
 function card(page: Page, title: string): Locator {
   return page.locator('[data-slot="card"]', { has: page.locator('[data-slot="card-title"]', { hasText: title }) })

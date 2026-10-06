@@ -1,6 +1,7 @@
 // SPEC.md §9.1: every declared metrics run, pinned on its seed. A change to the model shows up here
 // as a failing number, never as a silent drift.
 import { describe, expect, it } from 'vitest'
+import { runMetrics as meshMetrics, seedNetwork as meshSeed } from '@/case-studies/community-mesh/operations'
 import { runMetrics as campMetrics, seedNetwork as campSeed } from '@/case-studies/relief-camp/operations'
 import { runDiscover as sarDiscover, runMetrics as sarMetrics, seedNetwork as sarSeed } from '@/case-studies/sar-slope/operations'
 import { runMetrics as evaluationMetrics, seedNetwork as evaluationSeed } from '@/topics/evaluation/operations'
@@ -92,5 +93,17 @@ describe('relief-camp, seed 9', () => {
       ['1.1', '2.0'],
       ['0.89', '6.79'],
     ])
+  })
+})
+
+describe('community-mesh, seed 3 with M joined', () => {
+  const { steps } = meshMetrics(meshSeed('etx-watchdog'))
+
+  it('sends 30 packets per design and compares them', () => {
+    expect(steps.filter((s) => s.highlightLine === 7).map((s) => s.description)).toEqual([
+      'ETX with watchdog: flow 1 from S to D delivered 26 of 30 packets in 116 ticks.',
+      'Hop count: flow 1 from S to D delivered 0 of 30 packets in 32 ticks.',
+    ])
+    expect(steps.at(-1)?.description).toBe('On seed 3, with M joined, ETX with watchdog delivers 86.7 % and Hop count delivers 0.0 %.')
   })
 })

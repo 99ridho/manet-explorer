@@ -1,5 +1,6 @@
 // SPEC.md §19.0: case studies in week order. Each simulator is a TopicModule kept out of `topics`.
 import type { CaseStudyModule } from '@/types/case-study'
+import { communityMesh } from './community-mesh'
 import { reliefCamp } from './relief-camp'
 import { sarSlope } from './sar-slope'
 
@@ -7,6 +8,7 @@ import { sarSlope } from './sar-slope'
 export const caseStudies: CaseStudyModule[] = [
   sarSlope as unknown as CaseStudyModule,
   reliefCamp as unknown as CaseStudyModule,
+  communityMesh as unknown as CaseStudyModule,
 ]
 
 export function getCaseStudy(slug: string | undefined): CaseStudyModule | undefined {

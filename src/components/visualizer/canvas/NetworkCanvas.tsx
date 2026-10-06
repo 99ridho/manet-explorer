@@ -144,7 +144,8 @@ export function NetworkCanvas({ snapshot, nodeLabels, trails, extent }: NetworkC
             {(label || showQuality || l.bandwidth !== undefined) && (
               <text
                 x={mx}
-                y={my - 6}
+                // A horizontal link's label sits below it, clear of the two node circles at its ends.
+                y={Math.abs(a.y - b.y) < 1 ? my + R + 12 : my - 6}
                 textAnchor="middle"
                 fontSize={11}
                 fontFamily="var(--font-mono)"
