@@ -8,7 +8,7 @@ import { topics } from './registry'
 import { INPUTS } from './test-inputs'
 
 const MAX_FIELDS = 6
-const MAX_CHIP_LENGTH = 14 // `${key} = ${value}` fits one 6.75rem track in LiveFields
+const MAX_CHIP_LENGTH = 13 // `${key} = ${value}` fits one 6.75rem track in LiveFields; 14 truncates in the browser
 
 function expectScalarFields(fields: Record<string, string | number>, where: string) {
   const entries = Object.entries(fields)

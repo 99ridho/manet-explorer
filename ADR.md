@@ -71,3 +71,10 @@ The MPR seed follows the slide's four-step table, so line 8 fixes both B and D (
 - Status: Accepted
 
 §9.1, 10.2, 10.8 to 10.11, and 19 were rewritten from prose into Python ahead of implementation, with their step tables renumbered. 10.8 Advance (`advance-rwp`, `advance-rpgm`) and 19.1 Discover (`discover-flooding`, `discover-mpr`) split into one id per listing.
+
+## ADR-011: Week 2 DSDV, the shared simulation layer, and Week 5
+
+- Date: 2026-10-06
+- Status: Accepted
+
+DSDV prints one node's routing table under the network, with a button per node to pick another; a step that is about a node shows that node's table. `src/lib/sim/run.ts` is the §9.1 tick model: a flow sends one packet per tick, waits for an AODV-style discovery (the flood and the RREP each take a tick per hop), drops a packet whose next link is gone and sends an RERR back, retries a failed discovery 2 ticks later, and loses whatever has not arrived at the horizon. The result step of a metrics run carries a `metrics` field on the topic's snapshot, and the canvas draws `MetricsBars` while it is set. `NetworkCanvas` gained `trails` and `extent` props for moving nodes, so §7.2 stays verbatim. A live-field chip of 14 characters truncates in the browser, so the limit is 13; Week 5's chips are `lasts` and `paths` instead of `meanDur` and `pathAvail`.

@@ -7,6 +7,7 @@ import { broadcast } from './broadcast'
 import { geographicRouting } from './geographic-routing'
 import { clustering } from './clustering'
 import { addressAllocation } from './address-allocation'
+import { mobility } from './mobility'
 
 // Cast: each module is strongly typed internally; the registry erases those params.
 export const topics: TopicModule[] = [
@@ -17,6 +18,7 @@ export const topics: TopicModule[] = [
   geographicRouting as unknown as TopicModule,
   clustering as unknown as TopicModule,
   addressAllocation as unknown as TopicModule,
+  mobility as unknown as TopicModule,
 ]
 
 export function getTopic(slug: string | undefined): TopicModule | undefined {

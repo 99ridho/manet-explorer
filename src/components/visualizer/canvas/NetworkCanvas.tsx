@@ -37,7 +37,16 @@ export interface NodeCaption {
   hover?: boolean
 }
 
-export function NetworkCanvas({ snapshot, nodeLabels }: { snapshot: NetSnapshot; nodeLabels?: Record<string, NodeCaption> }) {
+interface NetworkCanvasProps {
+  snapshot: NetSnapshot
+  nodeLabels?: Record<string, NodeCaption>
+  /** Recent positions per node, oldest first, drawn as a fading line behind it. */
+  trails?: Record<string, { x: number; y: number }[]>
+  /** A fixed area in slide units, so moving nodes do not rescale the drawing. */
+  extent?: { w: number; h: number }
+}
+
+export function NetworkCanvas({ snapshot, nodeLabels, trails, extent }: NetworkCanvasProps) {
   const [focused, setFocused] = useState<string | null>(null)
   const { nodes, links, packets, highlight } = snapshot
 
@@ -51,11 +60,14 @@ export function NetworkCanvas({ snapshot, nodeLabels }: { snapshot: NetSnapshot;
 
   const byId = new Map(nodes.map((n) => [n.id, px(n)]))
   const pts = [...byId.values()]
-  const pad = Math.max(R * 2.5, (snapshot.range * UNIT) / 2)
-  const minX = Math.min(...pts.map((p) => p.x)) - pad
-  const maxX = Math.max(...pts.map((p) => p.x)) + pad
-  const minY = Math.min(...pts.map((p) => p.y)) - pad
-  const maxY = Math.max(...pts.map((p) => p.y)) + pad
+  // A fixed area already leaves room at its edges, so it needs only room for a node.
+  const pad = extent ? R * 1.5 : Math.max(R * 2.5, (snapshot.range * UNIT) / 2)
+  const xs = extent ? [0, extent.w * UNIT] : pts.map((p) => p.x)
+  const ys = extent ? [-extent.h * UNIT, 0] : pts.map((p) => p.y)
+  const minX = Math.min(...xs) - pad
+  const maxX = Math.max(...xs) + pad
+  const minY = Math.min(...ys) - pad
+  const maxY = Math.max(...ys) + pad
   const focusNode = focused ? nodes.find((n) => n.id === focused) : undefined
   const pathPts = (highlight?.path ?? []).map((id) => byId.get(id)).filter((p) => p !== undefined)
 
@@ -78,6 +90,22 @@ export function NetworkCanvas({ snapshot, nodeLabels }: { snapshot: NetSnapshot;
           strokeDasharray="4 4"
         />
       )}
+
+      {trails &&
+        Object.entries(trails).map(([id, trail]) =>
+          trail.length > 1 ? (
+            <polyline
+              key={`trail-${id}`}
+              points={trail.map((t) => `${px(t).x},${px(t).y}`).join(' ')}
+              fill="none"
+              stroke="var(--color-muted-foreground)"
+              strokeOpacity={0.45}
+              strokeWidth={2}
+              strokeDasharray="1 4"
+              strokeLinecap="round"
+            />
+          ) : null,
+        )}
 
       {pathPts.length > 1 && (
         <polyline

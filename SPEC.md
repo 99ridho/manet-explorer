@@ -1408,7 +1408,7 @@ The tracker for every module. A row reaches **Specified** only when its full Sec
 | `geographic-routing` | 3 | reviewed | Specified, 10.5 | Implemented |
 | `clustering` | 4 | reviewed | Specified, 10.6 | Implemented |
 | `address-allocation` | 4 | reviewed | Specified, 10.7 | Implemented |
-| `mobility` | 5 | reviewed | Specified, 10.8 | not started |
+| `mobility` | 5 | reviewed | Specified, 10.8 | Implemented |
 | `evaluation` | 6 | reviewed | Specified, 10.9 | not started |
 | `qos-routing` | 7 | reviewed | Specified, 10.10 | not started |
 | `routing-attacks` | 8 | reviewed | Specified, 10.11 | not started |

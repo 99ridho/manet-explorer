@@ -75,7 +75,10 @@ test.describe('desktop (lg)', () => {
   })
 
   // Topics whose canvas card carries more than the network (a routing table, a bar chart).
-  for (const [slug, operation, input] of [['proactive-routing', /move node/i, 'M3 M6']] as const) {
+  for (const [slug, operation, input] of [
+    ['proactive-routing', /move node/i, 'M3 M6'],
+    ['mobility', /metrics run/i, null],
+  ] as const) {
     test(`${slug}: the page still does not scroll`, async ({ page }) => {
       await openOperation(page, slug, operation)
       if (input) await page.getByRole('textbox').fill(input)
@@ -219,6 +222,7 @@ test.describe('phone', () => {
   for (const [slug, operation, input] of [
     ['proactive-routing', /move node/i, 'M3 M6'],
     ['broadcast', /select mprs/i, 'A'],
+    ['mobility', /metrics run/i, null],
     ['geographic-routing', /route/i, 'S D'],
     ['clustering', /elect/i, null],
     ['address-allocation', /merge partition/i, null],

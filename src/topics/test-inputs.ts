@@ -21,4 +21,6 @@ export const INPUTS: Record<string, unknown[]> = {
   'address-allocation/join-qdad': ['D C', 'D'],
   'address-allocation/leave-buddy': ['C', 'B', 'X'],
   'address-allocation/crash-buddy': ['C', ''],
+  'mobility/advance-rwp': [3, 0, 41],
+  'mobility/advance-rpgm': [3, 2.5],
 }
