@@ -78,6 +78,7 @@ test.describe('desktop (lg)', () => {
   for (const [slug, operation, input] of [
     ['proactive-routing', /move node/i, 'M3 M6'],
     ['mobility', /metrics run/i, null],
+    ['evaluation', /metrics over seeds/i, '10'],
   ] as const) {
     test(`${slug}: the page still does not scroll`, async ({ page }) => {
       await openOperation(page, slug, operation)
@@ -222,10 +223,11 @@ test.describe('phone', () => {
   for (const [slug, operation, input] of [
     ['proactive-routing', /move node/i, 'M3 M6'],
     ['broadcast', /select mprs/i, 'A'],
-    ['mobility', /metrics run/i, null],
     ['geographic-routing', /route/i, 'S D'],
     ['clustering', /elect/i, null],
     ['address-allocation', /merge partition/i, null],
+    ['mobility', /metrics run/i, null],
+    ['evaluation', /metrics over seeds/i, '10'],
   ] as const) {
     test(`${slug}: a seed run fits the width`, async ({ page }) => {
       await openOperation(page, slug, operation)

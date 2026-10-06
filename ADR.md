@@ -78,3 +78,10 @@ The MPR seed follows the slide's four-step table, so line 8 fixes both B and D (
 - Status: Accepted
 
 DSDV prints one node's routing table under the network, with a button per node to pick another; a step that is about a node shows that node's table. `src/lib/sim/run.ts` is the §9.1 tick model: a flow sends one packet per tick, waits for an AODV-style discovery (the flood and the RREP each take a tick per hop), drops a packet whose next link is gone and sends an RERR back, retries a failed discovery 2 ticks later, and loses whatever has not arrived at the horizon. The result step of a metrics run carries a `metrics` field on the topic's snapshot, and the canvas draws `MetricsBars` while it is set. `NetworkCanvas` gained `trails` and `extent` props for moving nodes, so §7.2 stays verbatim. A live-field chip of 14 characters truncates in the browser, so the limit is 13; Week 5's chips are `lasts` and `paths` instead of `meanDur` and `pathAvail`.
+
+## ADR-012: Week 6 metrics placement
+
+- Date: 2026-10-06
+- Status: Accepted
+
+§10.9's Metrics over seeds places 10 nodes in 6 × 4 but names no radius. At the topic's 1.2 most seeds left the flows disconnected under both graph models, so the bars were equal; this demo uses a radius of 2 for that placement, and the Protocol tab says so.

@@ -23,4 +23,5 @@ export const INPUTS: Record<string, unknown[]> = {
   'address-allocation/crash-buddy': ['C', ''],
   'mobility/advance-rwp': [3, 0, 41],
   'mobility/advance-rpgm': [3, 2.5],
+  'evaluation/metrics': [3, 0, 11],
 }
