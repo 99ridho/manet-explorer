@@ -1,5 +1,5 @@
-// SPEC.md §8 and §20: the step narration, the reason for it, the call it runs inside, its variables, and one numbered pseudocode listing with the
-// current step's line highlighted. Lines soft-wrap with a hanging indent; no horizontal scroll.
+// SPEC.md §8 and §20: the step narration and the reason for it, a card with the call it runs inside and its variables,
+// and one numbered pseudocode listing with the current step's line highlighted. Lines soft-wrap with a hanging indent; no horizontal scroll.
 import { useEffect, useRef } from 'react'
 import { GlossaryText } from '@/components/GlossaryText'
 import { callLine } from '@/lib/call-line'
@@ -47,16 +47,6 @@ export function CodePanel({ lines, currentStep, operationLabel }: CodePanelProps
                 <GlossaryText text={currentStep.why} claims={claims} block="why" />
               </p>
             )}
-            {call && <p className="mt-1.5 font-mono text-xs [overflow-wrap:anywhere]">{call}</p>}
-            {rest.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {rest.map(([k, v]) => (
-                  <Badge key={k} variant="outline" className="font-mono text-[11px]">
-                    {k} = {v}
-                  </Badge>
-                ))}
-              </div>
-            )}
           </>
         ) : (
           <p className="text-muted-foreground">
@@ -64,6 +54,21 @@ export function CodePanel({ lines, currentStep, operationLabel }: CodePanelProps
           </p>
         )}
       </div>
+
+      {(call || rest.length > 0) && (
+        <section aria-label="Call and variables" className="shrink-0 rounded-lg border bg-card px-3 py-2">
+          {call && <p className="font-mono text-xs [overflow-wrap:anywhere]">{call}</p>}
+          {rest.length > 0 && (
+            <div className={cn('flex flex-wrap gap-1.5', call && 'mt-1.5')}>
+              {rest.map(([k, v]) => (
+                <Badge key={k} variant="outline" className="font-mono text-[11px]">
+                  {k} = {v}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {lines.length > 0 && (
         <ol
