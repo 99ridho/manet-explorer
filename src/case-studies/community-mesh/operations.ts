@@ -1,7 +1,7 @@
 // SPEC.md §19.3: a household picks a route to the gateway by hop count or ETX, a router that lies
 // about a link joins, and packets cross weak links with retries while the watchdog listens.
 import { floodRreq } from '@/lib/dsr-flood'
-import { cloneNet, findLink, linkKey, listIds, makeLink, recorder } from '@/lib/net'
+import { cloneNet, findLink, linkKey, listIds, makeLink, pyList, recorder } from '@/lib/net'
 import { pushMetricsSteps } from '@/lib/sim/metrics'
 import { mulberry32 } from '@/lib/sim/rng'
 import type { FlowRun } from '@/lib/sim/run'
@@ -87,9 +87,11 @@ export function runFindRoute(state: MeshState): Result {
   work.route = null
   work.candidates = []
   work.focus = 'route'
-  const { steps, push, why } = recorder(work)
+  const { steps, push, why } = recorder(work, { src: SRC, dst: DST, routing: work.routing === 'hop' ? "'hop'" : "'etx'" })
   const lines = { tick: R.flood, blackHole: R.flood, tunnel: R.flood, dest: R.flood, arrival: R.flood }
-  const { routes, rreq } = floodRreq(work, SRC, DST, { blackHole: (id) => isBlackHole(work, id), farEnd: () => null }, push, why, lines)
+  // The flood runs inside flood_rreq() here, so its record and route variables stay off the call's line.
+  const flat: typeof push = (d, l, h, p) => push(d, l, h, p)
+  const { routes, rreq } = floodRreq(work, SRC, DST, { blackHole: (id) => isBlackHole(work, id), farEnd: () => null }, flat, why, lines)
   work.control += rreq + routes.reduce((c, r) => c + r.length - 1, 0)
   work.candidates = routes.map((route) => ({ route, hops: route.length - 1, etx: routeEtx(work, route) }))
   for (const c of work.candidates) {
@@ -149,7 +151,7 @@ function deliverOne(work: MeshSnapshot, p: number, push?: Push, why?: Why) {
     if (isBlackHole(work, v)) {
       work.dropped += 1
       work.focus = 'route'
-      push?.(`M drops packet ${p} without a trace.`, D.drop, { nodes: { [v]: 'dropped' }, links: tree(route) })
+      push?.(`M drops packet ${p} without a trace.`, D.drop, { nodes: { [v]: 'dropped' }, links: tree(route) }, [], { p, v })
       why?.(WHY.drop())
       return
     }
@@ -164,10 +166,13 @@ function deliverOne(work: MeshSnapshot, p: number, push?: Push, why?: Why) {
     if (!sent) {
       work.dropped += 1
       work.focus = 'links'
-      push?.(`${v} tried 4 times to reach ${nxt} and got no ACK, so packet ${p} is lost.`, D.lost, {
-        nodes: { [v]: 'current' },
-        links: { [linkKey(v, nxt)]: 'dropped' },
-      })
+      push?.(
+        `${v} tried 4 times to reach ${nxt} and got no ACK, so packet ${p} is lost.`,
+        D.lost,
+        { nodes: { [v]: 'current' }, links: { [linkKey(v, nxt)]: 'dropped' } },
+        [],
+        { p, v, nxt },
+      )
       why?.(WHY.lost(v, nxt))
       return
     }
@@ -178,31 +183,32 @@ function deliverOne(work: MeshSnapshot, p: number, push?: Push, why?: Why) {
   work.focus = 'route'
   push?.(`Packet ${p} reaches D after ${tries} transmissions.`, D.delivered, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [
     { kind: 'DATA', from: route[route.length - 2], to: DST, label: `${p}` },
-  ])
+  ], { p, delivered: 'True' })
   why?.(WHY.delivered())
 }
 
 /** SPEC §10.11 lines 7 to 10: v never hears nxt forward p. */
 function watch(work: MeshSnapshot, v: string, nxt: string, p: number, push?: Push, why?: Why) {
   const D = L.deliver
+  const at = { p, v, nxt }
   const f = (work.failures[nxt] ?? 0) + 1
   work.failures = { ...work.failures, [nxt]: f }
   work.focus = 'trust'
-  push?.(`${v} never hears ${nxt} forward packet ${p}: ${f} ${f === 1 ? 'failure' : 'failures'} for ${nxt}.`, D.watch, { nodes: { [nxt]: 'flagged' } })
+  push?.(`${v} never hears ${nxt} forward packet ${p}: ${f} ${f === 1 ? 'failure' : 'failures'} for ${nxt}.`, D.watch, { nodes: { [nxt]: 'flagged' } }, [], at)
   why?.(WHY.silence(v))
   if (f <= THRESHOLD || work.flagged.includes(nxt)) return
   work.flagged = [...work.flagged, nxt]
   work.control += 1
-  push?.(`${nxt} passed the threshold of ${THRESHOLD}, so ${v} reports it${v === SRC ? '' : ` to ${SRC}`}.`, D.watch, { nodes: { [nxt]: 'flagged' } })
+  push?.(`${nxt} passed the threshold of ${THRESHOLD}, so ${v} reports it${v === SRC ? '' : ` to ${SRC}`}.`, D.watch, { nodes: { [nxt]: 'flagged' } }, [], at)
   why?.(WHY.report(v))
   const others = work.candidates.filter((c) => !c.route.includes(nxt))
   const next = others.length ? others.reduce((b, c) => (c.etx < b.etx - 1e-9 ? c : b)) : null
   if (next) {
-    push?.(`The pathrater avoids ${nxt}: ${SRC} switches to ${listIds(next.route)}.`, D.watch, { links: tree(next.route), path: next.route })
+    push?.(`The pathrater avoids ${nxt}: ${SRC} switches to ${listIds(next.route)}.`, D.watch, { links: tree(next.route), path: next.route }, [], at)
     why?.(WHY.reroute())
     work.route = next.route
   } else {
-    push?.(`The pathrater avoids ${nxt}, but ${SRC} has no other route.`, D.watch, { nodes: { [nxt]: 'flagged' } })
+    push?.(`The pathrater avoids ${nxt}, but ${SRC} has no other route.`, D.watch, { nodes: { [nxt]: 'flagged' } }, [], at)
     why?.(WHY.noOther())
   }
 }
@@ -211,9 +217,14 @@ export function runDeliver(state: MeshState, input: unknown): Result {
   const D = L.deliver
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push, why } = recorder(work)
   const k = Number(input)
-  if (!Number.isInteger(k) || k < 1 || k > 30) {
+  const valid = Number.isInteger(k) && k >= 1 && k <= 30
+  const { steps, push, why } = recorder(work, {
+    route: work.route ? pyList(work.route) : 'None',
+    k: valid ? k : 'None',
+    watchdog: work.routing === 'etx-watchdog' ? 'True' : 'False',
+  })
+  if (!valid) {
     push('Type a number of packets from 1 to 30.', D.def)
     why(WHY.packets())
     return { steps, finalSnapshot: cloneNet(work) }
@@ -251,7 +262,7 @@ export function runMetrics(state: MeshState): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'route'
-  const { steps, push, why } = recorder(work)
+  const { steps, push, why } = recorder(work, { seed: work.seed })
   const order: Routing[] = work.routing === 'etx-watchdog' ? ['etx-watchdog', 'hop'] : ['hop', 'etx-watchdog']
   const designs = order.map((r) => ({ label: ROUTING_LABEL[r], runs: [meshRun(r, work.seed, 30)] }))
   pushMetricsSteps(push, `seed ${work.seed}, with M joined`, designs, (r) => {

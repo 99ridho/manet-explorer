@@ -1,5 +1,5 @@
 // SPEC.md §10.6: LCA cluster election by ID rule, with nodes leaving and joining.
-import { cloneNet, linkKey, listIds, makeLink, neighbors, parseIds, plural, recorder, removeNode } from '@/lib/net'
+import { cloneNet, linkKey, listIds, makeLink, neighbors, parseIds, plural, pyList, recorder, removeNode } from '@/lib/net'
 import { connectedUnitDisk, freeSpot } from '@/lib/sim/placement'
 import { mulberry32, randInt } from '@/lib/sim/rng'
 import type { HighlightKind, NetHighlight, NetNode } from '@/types/net'
@@ -91,8 +91,8 @@ const view = (s: ClusterSnapshot, nodes: Record<string, HighlightKind> = {}, lin
   links: { ...clusterLinks(s), ...links },
 })
 
-/** Lines 3 to 10 of elect over the undecided nodes; returns how many heads it made. */
-function electUndecided(work: ClusterSnapshot, push: Push, why: Why, lines: { head: number; member: number }): number {
+/** Lines 3 to 10 of elect over the undecided nodes; returns how many heads it made. `vars` binds v and n (not in leave's listing). */
+function electUndecided(work: ClusterSnapshot, push: Push, why: Why, lines: { head: number; member: number }, vars = true): number {
   const rule = work.rule
   const word = rule === 'highest' ? 'highest' : 'lowest'
   const undecided = new Set(work.nodes.filter((n) => work.head[n.id] === null).map((n) => n.id))
@@ -113,12 +113,14 @@ function electUndecided(work: ClusterSnapshot, push: Push, why: Why, lines: { he
         : `${v} has no undecided neighbor left, so it becomes a cluster head of its own.`,
       lines.head,
       view(work, { [v]: 'found' }),
+      [],
+      vars ? { v } : {},
     )
     why(open.length ? WHY.head(v, rule) : WHY.headAlone(v))
     for (const n of open) {
       work.head[n] = v
       undecided.delete(n)
-      push(`${n} joins cluster head ${v}.`, lines.member, view(work, { [v]: 'found', [n]: 'new' }, { [linkKey(n, v)]: 'new' }))
+      push(`${n} joins cluster head ${v}.`, lines.member, view(work, { [v]: 'found', [n]: 'new' }, { [linkKey(n, v)]: 'new' }), [], vars ? { v, n } : {})
       why(WHY.member(n, v))
     }
   }
@@ -143,7 +145,7 @@ function gatewaysStep(work: ClusterSnapshot, push: Push, why: Why, line: number)
 export function runElect(state: ClusterState): Result {
   const E = L.elect
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
+  const { steps, push, why } = recorder(work, { rank: work.rule })
   if (work.nodes.every((n) => work.head[n.id] !== null)) {
     push('Every node already has a cluster head.', E.none)
     why(WHY.allPlaced())
@@ -154,7 +156,7 @@ export function runElect(state: ClusterState): Result {
   for (const n of computeGateways(work)) {
     work.gateways.push(n)
     syncRoles(work)
-    push(`${n} neighbors cluster heads ${listIds(headsInRange(work, n))}, so it becomes a gateway.`, E.gateway, view(work, { [n]: 'new' }))
+    push(`${n} neighbors cluster heads ${listIds(headsInRange(work, n))}, so it becomes a gateway.`, E.gateway, view(work, { [n]: 'new' }), [], { n })
     why(WHY.gateway(n))
   }
   const heads = work.nodes.filter((n) => work.head[n.id] === n.id).length
@@ -166,9 +168,9 @@ export function runElect(state: ClusterState): Result {
 export function runLeave(state: ClusterState, input: unknown): Result {
   const V = L.leave
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const ids = parseIds(input)
   const u = ids.length === 1 ? ids[0] : null
+  const { steps, push, why } = recorder(work, { u: u ?? 'None', rank: work.rule })
   if (!u || !work.nodes.some((n) => n.id === u)) {
     push(u ? `There is no node ${u}.` : 'Type a node id, such as 9.', V.def)
     why(WHY.needNode())
@@ -188,15 +190,15 @@ export function runLeave(state: ClusterState, input: unknown): Result {
       if (heads.length) {
         const h = best(work.rule, heads)
         work.head[n] = h
-        push(`${n} joins cluster head ${h}, which it can still hear.`, V.rejoin, view(work, { [n]: 'new', [h]: 'found' }))
+        push(`${n} joins cluster head ${h}, which it can still hear.`, V.rejoin, view(work, { [n]: 'new', [h]: 'found' }), [], { n, heads: pyList(heads) })
         why(WHY.rejoin(n, h))
       } else {
         work.head[n] = null
-        push(`${n} hears no cluster head, so it is undecided again.`, V.orphan, view(work, { [n]: 'dropped' }))
+        push(`${n} hears no cluster head, so it is undecided again.`, V.orphan, view(work, { [n]: 'dropped' }), [], { n })
         why(WHY.orphan(n))
       }
     }
-    work.elections += electUndecided(work, push, why, { head: V.elect, member: V.elect })
+    work.elections += electUndecided(work, push, why, { head: V.elect, member: V.elect }, false)
   }
   gatewaysStep(work, push, why, V.gateways)
   return { steps, finalSnapshot: cloneNet(work) }
@@ -205,10 +207,10 @@ export function runLeave(state: ClusterState, input: unknown): Result {
 export function runJoin(state: ClusterState, input: unknown): Result {
   const J = L.join
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const ids = parseIds(input)
   const byId = new Map(work.nodes.map((n) => [n.id, n]))
   const [u, ...nbrs] = ids
+  const { steps, push, why } = recorder(work, { u: u ?? 'None', links: nbrs.length ? pyList([...new Set(nbrs)]) : 'None', rank: work.rule })
   if (!u || !/^\d{1,2}$/.test(u) || nbrs.length === 0) {
     push('Type a new id and its neighbors, such as 7 6 8.', J.def)
     why(WHY.joinInput())
@@ -239,7 +241,7 @@ export function runJoin(state: ClusterState, input: unknown): Result {
   if (heads.length) {
     const h = best(work.rule, heads)
     work.head[u] = h
-    push(`${u} joins cluster head ${h}, which it can hear.`, J.joins, view(work, { [u]: 'new', [h]: 'found' }))
+    push(`${u} joins cluster head ${h}, which it can hear.`, J.joins, view(work, { [u]: 'new', [h]: 'found' }), [], { heads: pyList(heads) })
     why(WHY.joins(u, h))
   } else {
     work.head[u] = u

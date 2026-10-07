@@ -1,10 +1,10 @@
 // SPEC.md §10.3: route discovery, data forwarding, and link breaks for AODV and DSR.
-import { cloneNet, explainer, findLink, frame, linkKey, listIds, makeLink, neighbors, plural } from '@/lib/net'
+import { cloneNet, findLink, linkKey, listIds, makeLink, neighbors, plural, pyList, recorder } from '@/lib/net'
 import { dist, unitDiskLinked } from '@/lib/sim/geometry'
 import { isConnected, spread } from '@/lib/sim/placement'
 import { mulberry32, randInt } from '@/lib/sim/rng'
-import type { HighlightKind, InFlight, NetHighlight } from '@/types/net'
-import type { OperationDefinition, OperationResult, Step } from '@/types/step-engine'
+import type { HighlightKind } from '@/types/net'
+import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { Protocol, ReactiveSnapshot, ReactiveState } from './types'
 import { WHY } from './why'
@@ -111,22 +111,13 @@ function withRoles(s: ReactiveSnapshot, src: string, dst: string) {
   }
 }
 
-function recorder(work: ReactiveSnapshot) {
-  const steps: Step<ReactiveSnapshot>[] = []
-  const push = (
-    description: string,
-    highlightLine: number,
-    highlight?: NetHighlight,
-    packets: InFlight[] = [],
-    variables?: Record<string, string | number>,
-  ) => steps.push({ id: steps.length, description, highlightLine, snapshot: frame(work, highlight, packets), variables })
-  return { steps, push, why: explainer(steps) }
-}
+/** The call's src and dst, or None when the input names no pair. */
+const pairArgs = (pair: { a: string; b: string } | null) => ({ src: pair?.a ?? 'None', dst: pair?.b ?? 'None' })
 
 export function runDiscover(state: ReactiveState, input: unknown): Result {
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const pair = parsePair(work, input)
+  const { steps, push, why } = recorder(work, pairArgs(pair))
   if (!pair) {
     push('Type a source and a destination, such as S D.', L.discover.aodv.def)
     why(WHY.needPair())
@@ -171,21 +162,24 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
       D.broadcast,
       { nodes: nodeMarks({ [v]: 'current' }), links: { ...reached } },
       [{ kind: 'RREQ', from: v, to: '*', label: `${id}` }],
-      { rreqTx: work.rreqTx },
+      dsr ? { v, record: pyList(record) } : { v },
     )
     why(dsr ? WHY.broadcastDsr(v, dst) : WHY.broadcastAodv(v, dst))
     for (const n of nbrs) {
       const key = linkKey(v, n)
       if (dsr && record.includes(n)) {
-        push(`${n} is already in the record, so it drops this copy.`, D.drop, { nodes: nodeMarks({ [n]: 'dropped' }), links: { ...reached } })
+        push(`${n} is already in the record, so it drops this copy.`, D.drop, { nodes: nodeMarks({ [n]: 'dropped' }), links: { ...reached } }, [], { v, n })
         why(WHY.inRecord(n))
         continue
       }
       if ((!dsr || n !== dst) && seen.has(n)) {
-        push(`${n} has already seen request ${id}, so it drops this copy.`, D.drop, {
-          nodes: nodeMarks({ [n]: 'dropped' }),
-          links: { ...reached },
-        })
+        push(
+          `${n} has already seen request ${id}, so it drops this copy.`,
+          D.drop,
+          { nodes: nodeMarks({ [n]: 'dropped' }), links: { ...reached } },
+          [],
+          { v, n },
+        )
         why(WHY.duplicate(n))
         continue
       }
@@ -194,26 +188,35 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
       const recordN = [...record, n]
       if (firstCopy) reached[key] = 'tree'
       if (dsr) {
-        push(`${n} adds itself: the record is now ${listIds(recordN)}.`, D.first, {
-          nodes: nodeMarks({ [n]: 'new' }),
-          links: { ...reached, [key]: 'new' },
-        })
+        push(
+          `${n} adds itself: the record is now ${listIds(recordN)}.`,
+          D.first,
+          { nodes: nodeMarks({ [n]: 'new' }), links: { ...reached, [key]: 'new' } },
+          [],
+          { v, n, record_n: pyList(recordN) },
+        )
         why(WHY.addSelf(dst))
       } else {
         reverse[n] = v
-        push(`${n} hears the RREQ first from ${v}, so it records ${v} as its way back to ${src}.`, D.first, {
-          nodes: nodeMarks({ [n]: 'new' }),
-          links: { ...reached, [key]: 'new' },
-        })
+        push(
+          `${n} hears the RREQ first from ${v}, so it records ${v} as its way back to ${src}.`,
+          D.first,
+          { nodes: nodeMarks({ [n]: 'new' }), links: { ...reached, [key]: 'new' } },
+          [],
+          { v, n },
+        )
         why(WHY.reversePath(n, src, dst))
       }
       if (n === dst) {
         if (dsr) {
           candidates.push(recordN)
-          push(`${dst} receives the record ${listIds(recordN)}.`, D.arrived, { nodes: nodeMarks({ [dst]: 'found' }), links: { ...reached } })
+          push(`${dst} receives the record ${listIds(recordN)}.`, D.arrived, { nodes: nodeMarks({ [dst]: 'found' }), links: { ...reached } }, [], {
+            n,
+            record_n: pyList(recordN),
+          })
           why(WHY.arrivedDsr(dst))
         } else {
-          push(`The RREQ reaches ${dst} through ${v}.`, D.arrived, { nodes: nodeMarks({ [dst]: 'found' }), links: { ...reached } })
+          push(`The RREQ reaches ${dst} through ${v}.`, D.arrived, { nodes: nodeMarks({ [dst]: 'found' }), links: { ...reached } }, [], { v, n })
           why(WHY.arrivedAodv(src, dst))
         }
       } else {
@@ -243,15 +246,21 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
         : `${dst} picks ${listIds(route)}: ${hops}, the only record that arrived.`,
       L.discover.dsr.pick,
       { links: pathLinks, path: route },
+      [],
+      { route: pyList(route) },
     )
     why(candidates.length > 1 ? WHY.pickFirst(dst) : WHY.pickOnly(dst))
     work.control += route.length - 1
-    push(`The RREP carries ${listIds(route)} back to ${src}.`, L.discover.dsr.rrep, { links: pathLinks, path: route }, [
-      { kind: 'RREP', from: dst, to: route[route.length - 2] },
-    ])
+    push(
+      `The RREP carries ${listIds(route)} back to ${src}.`,
+      L.discover.dsr.rrep,
+      { links: pathLinks, path: route },
+      [{ kind: 'RREP', from: dst, to: route[route.length - 2] }],
+      { route: pyList(route) },
+    )
     why(WHY.rrepDsr(src, dst))
     work.cache = { ...work.cache, [src]: { ...(work.cache[src] ?? {}), [dst]: route } }
-    push(`${src} stores ${listIds(route)} in its route cache.`, L.discover.dsr.cache, { links: pathLinks, path: route })
+    push(`${src} stores ${listIds(route)} in its route cache.`, L.discover.dsr.cache, { links: pathLinks, path: route }, [], { route: pyList(route) })
     why(WHY.cache(src))
   } else {
     const rrepLinks: Record<string, HighlightKind> = {}
@@ -268,6 +277,7 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
         L.discover.aodv.rrep,
         { nodes: { [prev]: 'current' }, links: { ...rrepLinks } },
         [{ kind: 'RREP', from: w, to: prev }],
+        { w, prev },
       )
       why(WHY.rrepHop(prev, dst))
       w = prev
@@ -278,8 +288,8 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
 
 export function runSend(state: ReactiveState, input: unknown): Result {
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const pair = parsePair(work, input)
+  const { steps, push, why } = recorder(work, { ...pairArgs(pair), payload: 'data' })
   if (!pair) {
     push('Type a source and a destination, such as S D.', L.send.aodv.def)
     why(WHY.needPair())
@@ -294,7 +304,7 @@ export function runSend(state: ReactiveState, input: unknown): Result {
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const dsr = work.protocol === 'dsr'
-  const header = dsr ? { header: route.length } : undefined
+  const header: Record<string, number> = dsr ? { header: route.length } : {}
   const done: Record<string, HighlightKind> = {}
   for (let i = 0; i + 1 < route.length; i++) {
     const v = route[i]
@@ -306,19 +316,23 @@ export function runSend(state: ReactiveState, input: unknown): Result {
       S.lookup,
       { nodes: { [v]: 'current' }, links: { ...done }, path: route },
       [],
-      header,
+      { ...header, v, nxt },
     )
     why(dsr ? WHY.lookupDsr(v) : WHY.lookupAodv(v, dst))
     const link = findLink(work, v, nxt)
     if (!link || link.broken) {
-      push(`Link ${v}-${nxt} is broken, so the packet stops at ${v}.`, S.forward, { nodes: { [v]: 'dropped' }, links: { ...done } })
+      push(`Link ${v}-${nxt} is broken, so the packet stops at ${v}.`, S.forward, { nodes: { [v]: 'dropped' }, links: { ...done } }, [], {
+        ...header,
+        v,
+        nxt,
+      })
       why(WHY.sendBroken(v, nxt))
       return { steps, finalSnapshot: cloneNet(work) }
     }
     done[linkKey(v, nxt)] = 'tree'
     push(`The packet moves from ${v} to ${nxt}.`, S.forward, { nodes: { [nxt]: 'current' }, links: { ...done }, path: route }, [
       { kind: 'DATA', from: v, to: nxt },
-    ], header)
+    ], { ...header, v, nxt })
     why(WHY.forward(v, nxt))
   }
   push(`The packet reaches ${dst} after ${plural(route.length - 1, 'hop')}.`, S.done, {
@@ -333,8 +347,8 @@ export function runSend(state: ReactiveState, input: unknown): Result {
 export function runBreakLink(state: ReactiveState, input: unknown): Result {
   const B = L.breakLink
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const pair = parsePair(work, input)
+  const { steps, push, why } = recorder(work, { u: pair?.a ?? 'None', v: pair?.b ?? 'None' })
   const link = pair ? findLink(work, pair.a, pair.b) : undefined
   if (!pair || !link || link.broken || link.virtual) {
     const name = pair ? `${pair.a}-${pair.b}` : String(input ?? '').trim() || 'that'
@@ -367,10 +381,11 @@ export function runBreakLink(state: ReactiveState, input: unknown): Result {
     B.rerr,
     { nodes: { [up]: 'current' }, links: { [key]: 'dropped' } },
     at === 0 ? [] : [{ kind: 'RERR', from: up, to: route[at - 1] }],
+    { end: up },
   )
   why(at === 0 ? WHY.rerrAtSource(src) : WHY.rerrUp(src))
   if (work.protocol === 'dsr') {
-    push(`${src} deletes the cached route ${listIds(route)}.`, B.remove, { nodes: { [src]: 'dropped' }, links: { [key]: 'dropped' } })
+    push(`${src} deletes the cached route ${listIds(route)}.`, B.remove, { nodes: { [src]: 'dropped' }, links: { [key]: 'dropped' } }, [], { node: src })
     why(WHY.deleteDsr(src))
     const cache = { ...(work.cache[src] ?? {}) }
     delete cache[dst]
@@ -378,7 +393,9 @@ export function runBreakLink(state: ReactiveState, input: unknown): Result {
   } else {
     for (let i = at; i >= 0; i--) {
       const n = route[i]
-      push(`${n} deletes its route to ${dst}, which used ${u}-${v}.`, B.remove, { nodes: { [n]: 'dropped' }, links: { [key]: 'dropped' } })
+      push(`${n} deletes its route to ${dst}, which used ${u}-${v}.`, B.remove, { nodes: { [n]: 'dropped' }, links: { [key]: 'dropped' } }, [], {
+        node: n,
+      })
       why(WHY.deleteAodv(n))
       const table = { ...(work.route[n] ?? {}) }
       delete table[dst]
@@ -386,10 +403,13 @@ export function runBreakLink(state: ReactiveState, input: unknown): Result {
     }
   }
   work.control += 1
-  push(`${down} also sends an RERR, since it sits at the other end of ${u}-${v}.`, B.rerr, {
-    nodes: { [down]: 'current' },
-    links: { [key]: 'dropped' },
-  })
+  push(
+    `${down} also sends an RERR, since it sits at the other end of ${u}-${v}.`,
+    B.rerr,
+    { nodes: { [down]: 'current' }, links: { [key]: 'dropped' } },
+    [],
+    { end: down },
+  )
   why(WHY.rerrDown(down))
   push(`${src} has no route to ${dst} now; its next discovery uses request id ${work.requestId + 1}.`, B.done, {
     nodes: { [src]: 'current' },

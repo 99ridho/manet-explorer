@@ -98,7 +98,7 @@ export function pushMetricsSteps(
         ML.flow,
         undefined,
         [],
-        { pdr: fmtPdr(s.pdr), delay: fmtDelay(s.delay), overhead: fmtOverhead(s.overhead) },
+        { design: d.label, flow: `(${run.flow.src}, ${run.flow.dst})`, pdr: fmtPdr(s.pdr), delay: fmtDelay(s.delay), overhead: fmtOverhead(s.overhead) },
       )
       why(
         i === 0

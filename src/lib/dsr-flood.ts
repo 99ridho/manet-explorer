@@ -2,9 +2,9 @@
 // its first copy and adds itself to the record, the destination answers every copy, a black hole
 // answers at once with a route it does not have, and a tunnel end replays the request at its far end.
 import type { HighlightKind, InFlight, NetHighlight, NetSnapshot } from '@/types/net'
-import { linkKey, listIds, neighbors } from './net'
+import { linkKey, listIds, neighbors, pyList } from './net'
 
-type Push = (description: string, line: number, highlight?: NetHighlight, packets?: InFlight[]) => void
+type Push = (description: string, line: number, highlight?: NetHighlight, packets?: InFlight[], variables?: Record<string, string | number>) => void
 
 export interface FloodRules {
   blackHole: (id: string) => boolean
@@ -61,7 +61,7 @@ export function floodRreq(
         pending.push({ at: t + record.length - 1, route: fake })
         push(`${n} answers at once, claiming a route ${listIds(fake)} it does not have.`, lines.blackHole, { nodes: { [n]: 'flagged' } }, [
           { kind: 'RREP', from: n, to: record[record.length - 2] },
-        ])
+        ], { n, record: pyList(record) })
         why(`${n} wants to sit on the route, so it answers at once with a short route it does not have. A quick, short answer looks attractive to the source.`)
       }
       const far = rules.farEnd(n)
@@ -73,20 +73,21 @@ export function floodRreq(
           lines.tunnel,
           { links: { [linkKey(n, far)]: 'active' } },
           [{ kind: 'RREQ', from: n, to: far }],
+          { n, record: pyList(record) },
         )
         why('The two attackers carry the request over a hidden link, so it reaches the far side sooner and in fewer apparent hops than over the real path.')
       }
     }
     for (const record of copies) {
       pending.push({ at: t + record.length - 1, route: record })
-      push(`${dst} receives the record ${listIds(record)} and answers.`, lines.dest, { nodes: { [dst]: 'found' } })
+      push(`${dst} receives the record ${listIds(record)} and answers.`, lines.dest, { nodes: { [dst]: 'found' } }, [], { record: pyList(record) })
       why(`Each copy reached ${dst} along a different chain of nodes, and ${dst} answers every one so the source can choose.`)
     }
     for (const r of pending.filter((p) => p.at === t)) {
       routes.push(r.route)
       push(`An RREP with ${listIds(r.route)} reaches ${src} at tick ${t}.`, lines.arrival, { nodes: { [src]: 'current' } }, [
         { kind: 'RREP', from: r.route[1], to: src },
-      ])
+      ], { route: pyList(r.route) })
       why('The answer travels back along the recorded route, so a route that looks shorter answers sooner.')
     }
     for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at === t) pending.splice(i, 1)

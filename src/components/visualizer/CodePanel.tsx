@@ -1,7 +1,8 @@
-// SPEC.md §8 and §20: the step narration, the reason for it, its variables, and one numbered pseudocode listing with the
+// SPEC.md §8 and §20: the step narration, the reason for it, the call it runs inside, its variables, and one numbered pseudocode listing with the
 // current step's line highlighted. Lines soft-wrap with a hanging indent; no horizontal scroll.
 import { useEffect, useRef } from 'react'
 import { GlossaryText } from '@/components/GlossaryText'
+import { callLine } from '@/lib/call-line'
 import type { GlossaryClaims } from '@/lib/glossary'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -18,6 +19,7 @@ export function CodePanel({ lines, currentStep, operationLabel }: CodePanelProps
   const listRef = useRef<HTMLOListElement>(null)
   // One map per render, so the description and the Why line mark each term once between them.
   const claims: GlossaryClaims = new Map()
+  const { call, rest } = currentStep ? callLine(lines, currentStep.highlightLine, currentStep.variables) : { call: null, rest: [] }
 
   // Scroll the <ol> itself rather than scrollIntoView, so stepping never moves the page.
   useEffect(() => {
@@ -45,9 +47,10 @@ export function CodePanel({ lines, currentStep, operationLabel }: CodePanelProps
                 <GlossaryText text={currentStep.why} claims={claims} block="why" />
               </p>
             )}
-            {currentStep.variables && (
+            {call && <p className="mt-1.5 font-mono text-xs [overflow-wrap:anywhere]">{call}</p>}
+            {rest.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {Object.entries(currentStep.variables).map(([k, v]) => (
+                {rest.map(([k, v]) => (
                   <Badge key={k} variant="outline" className="font-mono text-[11px]">
                     {k} = {v}
                   </Badge>

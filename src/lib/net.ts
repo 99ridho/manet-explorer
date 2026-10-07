@@ -55,8 +55,21 @@ export function listIds(ids: string[]): string {
   return ids.join(', ')
 }
 
-/** Collects steps over a working copy: each push freezes `work` as it is now into a step snapshot. */
-export function recorder<T extends NetSnapshot>(work: T) {
+/** "[S, A, C, D]": a list as a step variable, so the call line keeps its commas apart. */
+export function pyList(ids: string[]): string {
+  return `[${ids.join(', ')}]`
+}
+
+/** "{B, D}", or "set()" when empty: a set as a step variable. */
+export function pySet(ids: string[]): string {
+  return ids.length ? `{${ids.join(', ')}}` : 'set()'
+}
+
+/**
+ * Collects steps over a working copy: each push freezes `work` as it is now into a step snapshot.
+ * `args` are the call's arguments (SPEC.md §8 call line), carried on every step under the step's own variables.
+ */
+export function recorder<T extends NetSnapshot>(work: T, args: Record<string, string | number> = {}) {
   const steps: Step<T>[] = []
   const push = (
     description: string,
@@ -64,7 +77,7 @@ export function recorder<T extends NetSnapshot>(work: T) {
     highlight?: NetHighlight,
     packets: InFlight[] = [],
     variables?: Record<string, string | number>,
-  ) => steps.push({ id: steps.length, description, highlightLine, snapshot: frame(work, highlight, packets), variables })
+  ) => steps.push({ id: steps.length, description, highlightLine, snapshot: frame(work, highlight, packets), variables: { ...args, ...variables } })
   return { steps, push, why: explainer(steps) }
 }
 

@@ -110,8 +110,7 @@ export function runBuildLinks(state: MultihopState): Result {
     }
     const snap = frame(work, { nodes: { [pair.p]: 'current', [pair.q]: 'current' }, links: { [key]: kind } })
     if (!pair.linked) snap.links.push(shown)
-    const variables: Record<string, string | number> = { d: f2(pair.d) }
-    if (work.model === 'shadowing') variables.margin = `${f2(pair.margin)} dB`
+    const variables = { radio_range: range, p: pair.p, q: pair.q, d: f2(pair.d) }
     steps.push({ id: steps.length, description, highlightLine: pair.linked ? L.build.add : L.build.test, snapshot: snap, variables })
     if (work.model === 'disk') why(pair.linked ? WHY.linkedDisk(pair.p, pair.q) : WHY.apartDisk(pair.p, pair.q))
     else why(pair.linked ? WHY.linkedShadow() : WHY.apartShadow(pair.p, pair.q))
@@ -126,6 +125,7 @@ export function runBuildLinks(state: MultihopState): Result {
     description: `Build links made ${plural(work.links.length, 'link')} among ${plural(work.nodes.length, 'node')}.`,
     highlightLine: L.build.done,
     snapshot: frame(work),
+    variables: { radio_range: range },
   })
   why(WHY.built())
   return { steps, finalSnapshot: cloneNet(work) }
@@ -152,6 +152,7 @@ export function runFindBridges(state: MultihopState): Result {
     highlightLine: number,
     nodes: Record<string, HighlightKind> = {},
     links: Record<string, HighlightKind> = {},
+    locals: Record<string, string | number> = {},
   ) => {
     const marks = {
       nodes: { ...Object.fromEntries(cuts.map((c) => [c, 'flagged' as const])), ...nodes },
@@ -162,7 +163,7 @@ export function runFindBridges(state: MultihopState): Result {
       description,
       highlightLine,
       snapshot: frame(work, marks),
-      variables: { disc: table(disc), low: table(low) },
+      variables: { ...locals, disc: table(disc), low: table(low) },
     })
   }
   const markCut = (v: string) => {
@@ -170,27 +171,31 @@ export function runFindBridges(state: MultihopState): Result {
   }
 
   const dfs = (v: string, parent: string | null) => {
+    const at = { v, parent: parent ?? 'None' }
     time += 1
     disc[v] = time
     low[v] = time
-    push(`Visiting ${v}: disc = low = ${time}.`, L.bridges.enter, { [v]: 'current' })
+    push(`Visiting ${v}: disc = low = ${time}.`, L.bridges.enter, { [v]: 'current' }, {}, at)
     why(WHY.enter(v))
     let children = 0
     for (const w of neighbors(work, v)) {
       const key = linkKey(v, w)
       if (disc[w] === undefined) {
         children += 1
-        push(`${w} is unvisited, so the search goes from ${v} to ${w}.`, L.bridges.tree, { [v]: 'current' }, { [key]: 'active' })
+        push(`${w} is unvisited, so the search goes from ${v} to ${w}.`, L.bridges.tree, { [v]: 'current' }, { [key]: 'active' }, { ...at, w })
         why(WHY.tree(v, w))
         dfs(w, v)
         low[v] = Math.min(low[v], low[w])
-        push(`Back at ${v} from ${w}: low[${v}] = ${low[v]}.`, L.bridges.back_from_child, { [v]: 'current' })
+        push(`Back at ${v} from ${w}: low[${v}] = ${low[v]}.`, L.bridges.back_from_child, { [v]: 'current' }, {}, { ...at, w })
         why(WHY.backFromChild(v, w))
         if (low[w] > disc[v]) {
           bridges.push(key)
           push(
             `low[${w}] = ${low[w]} is greater than disc[${v}] = ${disc[v]}, so ${v}-${w} is a bridge: it is the only way between the two parts.`,
             L.bridges.bridge,
+            {},
+            {},
+            { ...at, w },
           )
           why(WHY.bridge(v, w))
         }
@@ -199,18 +204,21 @@ export function runFindBridges(state: MultihopState): Result {
           push(
             `low[${w}] = ${low[w]} is not less than disc[${v}] = ${disc[v]}, so removing ${v} cuts ${w} off: ${v} is an articulation point.`,
             L.bridges.cut,
+            {},
+            {},
+            { ...at, w },
           )
           why(WHY.cut(v, w))
         }
       } else if (w !== parent) {
         low[v] = Math.min(low[v], disc[w])
-        push(`${w} was visited earlier and is not the parent, so low[${v}] = ${low[v]}.`, L.bridges.back_link, { [v]: 'current' }, { [key]: 'active' })
+        push(`${w} was visited earlier and is not the parent, so low[${v}] = ${low[v]}.`, L.bridges.back_link, { [v]: 'current' }, { [key]: 'active' }, { ...at, w })
         why(WHY.backLink(v, w))
       }
     }
     if (parent === null && children > 1) {
       markCut(v)
-      push(`${v} started the search and has ${children} children, so it is an articulation point.`, L.bridges.root_cut)
+      push(`${v} started the search and has ${children} children, so it is an articulation point.`, L.bridges.root_cut, {}, {}, { ...at, children })
       why(WHY.rootCut(v))
     }
   }
@@ -230,13 +238,14 @@ const ETX_INPUT = /^([A-Za-z0-9]+)\s+([A-Za-z0-9]+)\s+(\d*\.?\d+)\s+(\d*\.?\d+)$
 export function runLinkEtx(state: MultihopState, input: string): Result {
   const steps: Step<MultihopSnapshot>[] = []
   const work = cloneNet(state)
-  const push = (description: string, highlightLine: number, links: Record<string, HighlightKind> = {}) =>
-    steps.push({ id: steps.length, description, highlightLine, snapshot: frame(work, { links }) })
-  const why = explainer(steps)
-
   const m = ETX_INPUT.exec(String(input ?? '').trim())
   const wpq = m ? Number(m[3]) : NaN
   const wqp = m ? Number(m[4]) : NaN
+  const args = m ? { p: m[1].toUpperCase(), q: m[2].toUpperCase(), w_pq: short(wpq), w_qp: short(wqp) } : { p: 'None', q: 'None', w_pq: 'None', w_qp: 'None' }
+  const push = (description: string, highlightLine: number, links: Record<string, HighlightKind> = {}, locals: Record<string, string> = {}) =>
+    steps.push({ id: steps.length, description, highlightLine, snapshot: frame(work, { links }), variables: { ...args, ...locals } })
+  const why = explainer(steps)
+
   if (!m || !(wpq >= 0 && wpq <= 1) || !(wqp >= 0 && wqp <= 1)) {
     push('Type two linked nodes and two delivery ratios from 0 to 1, such as C D 0.8 0.5.', L.etx.def)
     why(WHY.etxInput())
@@ -252,22 +261,22 @@ export function runLinkEtx(state: MultihopState, input: string): Result {
   }
   const key = linkKey(p, q)
   const cycle = wpq * wqp
-  push(`A full cycle succeeds with probability ${short(wpq)} × ${short(wqp)} = ${short(cycle)}.`, L.etx.cycle, { [key]: 'active' })
+  push(`A full cycle succeeds with probability ${short(wpq)} × ${short(wqp)} = ${short(cycle)}.`, L.etx.cycle, { [key]: 'active' }, { cycle: short(cycle) })
   why(WHY.etxCycle())
   if (cycle === 0) {
-    push('The cycle never succeeds, so the expected number of transmissions has no bound.', L.etx.etx, { [key]: 'dropped' })
+    push('The cycle never succeeds, so the expected number of transmissions has no bound.', L.etx.etx, { [key]: 'dropped' }, { cycle: short(cycle) })
     why(WHY.etxZero())
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const etx = 1 / cycle
-  push(`ETX = 1 / ${short(cycle)} = ${short(etx)} expected transmissions.`, L.etx.etx, { [key]: 'active' })
+  push(`ETX = 1 / ${short(cycle)} = ${short(etx)} expected transmissions.`, L.etx.etx, { [key]: 'active' }, { etx: short(etx) })
   why(WHY.etx())
   // quality is the a-to-b direction of the stored link.
   link.quality = link.a === p ? wpq : wqp
   link.qualityBack = link.a === p ? wqp : wpq
   work.etx = { ...work.etx, [key]: etx }
   withEtxLabels(work)
-  push(`Link ${p}-${q} now shows ETX ${short(etx)}.`, L.etx.store, { [key]: 'found' })
+  push(`Link ${p}-${q} now shows ETX ${short(etx)}.`, L.etx.store, { [key]: 'found' }, { etx: short(etx) })
   why(WHY.etxStore(p, q))
   return { steps, finalSnapshot: cloneNet(work) }
 }

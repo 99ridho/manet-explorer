@@ -100,12 +100,14 @@ function elect(s: CampSnapshot, push?: Push, why?: Why) {
         : `${v} has no undecided neighbor left, so it becomes a cluster head of its own.`,
       L.elect.head,
       view(s, { [v]: 'found' }),
+      [],
+      { v },
     )
     why?.(open.length ? WHY.head(v) : WHY.headAlone(v))
     for (const n of open) {
       s.head = { ...s.head, [n]: v }
       undecided.delete(n)
-      push?.(`${n} joins cluster head ${v}.`, L.elect.member, view(s, { [v]: 'found', [n]: 'new' }, { [linkKey(n, v)]: 'new' }))
+      push?.(`${n} joins cluster head ${v}.`, L.elect.member, view(s, { [v]: 'found', [n]: 'new' }, { [linkKey(n, v)]: 'new' }), [], { v, n })
       why?.(WHY.member(n, v))
     }
   }
@@ -191,11 +193,12 @@ export function runJoin(state: CampState, input: unknown): Result {
   const J = L.join
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push, why } = recorder(work)
   const at = (f: Focus) => (work.focus = f)
   const parts = String(input ?? '').trim().split(/[\s,]+/).filter(Boolean)
   const [u, near] = parts
-  if (parts.length !== 2 || !/^\d{1,3}$/.test(u) || work.nodes.some((n) => n.id === u) || !work.nodes.some((n) => n.id === near && !n.down)) {
+  const valid = parts.length === 2 && /^\d{1,3}$/.test(u) && !work.nodes.some((n) => n.id === u) && work.nodes.some((n) => n.id === near && !n.down)
+  const { steps, push, why } = recorder(work, { u: valid ? u : 'None', near: valid ? near : 'None' })
+  if (!valid) {
     at('addresses')
     push('Type a new id and a nearby volunteer, such as 10 7.', J.def)
     why(WHY.joinInput())
@@ -218,7 +221,7 @@ export function runJoin(state: CampState, input: unknown): Result {
   let via: string | null = null
   for (const n of order) {
     if (work.address[n] == null || largest(work.pool[n] ?? []) <= 1) {
-      push(`${n} has no spare address, so ${u} asks the next neighbor.`, J.skip, { nodes: { [n]: 'dropped', [u]: 'current' } })
+      push(`${n} has no spare address, so ${u} asks the next neighbor.`, J.skip, { nodes: { [n]: 'dropped', [u]: 'current' } }, [], { n })
       why(WHY.skip(n))
       continue
     }
@@ -232,12 +235,12 @@ export function runJoin(state: CampState, input: unknown): Result {
   }
   const hl = { nodes: { [via]: 'current' as HighlightKind, [u]: 'new' as HighlightKind }, links: { [linkKey(u, via)]: 'active' as HighlightKind } }
   const whole = work.pool[via].reduce((b, r) => (size(r) > size(b) ? r : b))
-  push(`${via} splits ${rangeText(whole)} in half.`, J.buddy, hl)
+  push(`${via} splits ${rangeText(whole)} in half.`, J.buddy, hl, [], { n: via })
   why(WHY.split(via))
   const { keep, give } = split(work, via, u)
-  push(`${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${u}.`, J.buddy, hl)
+  push(`${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${u}.`, J.buddy, hl, [], { n: via })
   why(WHY.hand(via))
-  push(`${u} takes address ${give[0]} without asking any other node.`, J.buddy, { nodes: { [u]: 'found' } })
+  push(`${u} takes address ${give[0]} without asking any other node.`, J.buddy, { nodes: { [u]: 'found' } }, [], { n: via })
   why(WHY.address(u))
 
   at('clusters')
@@ -263,7 +266,7 @@ export function runElect(state: CampState): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'clusters'
-  const { steps, push, why } = recorder(work)
+  const { steps, push, why } = recorder(work, { rank: 'highest' })
   work.head = Object.fromEntries(work.nodes.map((n) => [n.id, null]))
   work.gateways = []
   syncRoles(work)
@@ -276,7 +279,7 @@ export function runElect(state: CampState): Result {
   for (const n of work.nodes.map((x) => x.id).filter((n) => work.head[n] && !isHead(work, n) && headsInRange(work, n).length >= 2)) {
     work.gateways = [...work.gateways, n]
     syncRoles(work)
-    push(`${n} neighbors cluster heads ${listIds(headsInRange(work, n))}, so it becomes a gateway.`, E.gateway, view(work, { [n]: 'new' }))
+    push(`${n} neighbors cluster heads ${listIds(headsInRange(work, n))}, so it becomes a gateway.`, E.gateway, view(work, { [n]: 'new' }), [], { n })
     why(WHY.gateway(n))
   }
   const heads = work.nodes.filter((n) => isHead(work, n.id)).length
@@ -319,9 +322,10 @@ export function runAdvance(state: CampState, input: unknown): Result {
   const A = L.advance
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push, why } = recorder(work)
   const ticks = Number(input)
-  if (!Number.isInteger(ticks) || ticks < 1 || ticks > 30) {
+  const valid = Number.isInteger(ticks) && ticks >= 1 && ticks <= 30
+  const { steps, push, why } = recorder(work, { ticks: valid ? ticks : 'None' })
+  if (!valid) {
     work.focus = 'movement'
     push('Type a number of ticks from 1 to 30.', A.def)
     why(WHY.ticks())
@@ -332,7 +336,7 @@ export function runAdvance(state: CampState, input: unknown): Result {
     const { lost, joined, became } = tickCamp(work)
     if (lost === 0) {
       work.focus = 'movement'
-      push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and every member still hears its head.`, A.calm, view(work))
+      push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and every member still hears its head.`, A.calm, view(work), [], { t: i })
       why(WHY.calm())
     } else {
       work.focus = 'clusters'
@@ -340,6 +344,8 @@ export function runAdvance(state: CampState, input: unknown): Result {
         `Tick ${work.tick}: ${plural(lost, 'volunteer')} lost their head; ${joined} joined another head and ${became} became heads.`,
         A.changes,
         view(work),
+        [],
+        { t: i },
       )
       why(WHY.changes())
     }
@@ -373,7 +379,7 @@ export function runMetrics(state: CampState): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'movement'
-  const { steps, push, why } = recorder(work)
+  const { steps, push, why } = recorder(work, { seed: work.seed })
   const order: Mobility[] = work.mobility === 'rpgm' ? ['rpgm', 'rwp'] : ['rwp', 'rpgm']
   const designs = order.map((m) => {
     const topo = campTrajectory(m, work.seed, METRICS_TICKS)

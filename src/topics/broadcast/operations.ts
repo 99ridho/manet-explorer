@@ -1,5 +1,5 @@
 // SPEC.md §10.4: MPR selection, broadcast by blind flooding or MPR relaying, and link removal.
-import { cloneNet, findLink, linkKey, listIds, makeLink, neighbors, parseIds, plural, recorder } from '@/lib/net'
+import { cloneNet, findLink, linkKey, listIds, makeLink, neighbors, parseIds, plural, pySet, recorder } from '@/lib/net'
 import { connectedUnitDisk } from '@/lib/sim/placement'
 import { mulberry32, randInt } from '@/lib/sim/rng'
 import type { HighlightKind, NetSnapshot } from '@/types/net'
@@ -121,8 +121,8 @@ const marks = (ids: string[], kind: HighlightKind) => Object.fromEntries(ids.map
 export function runSelectMpr(state: BroadcastState, input: unknown): Result {
   const S = L.select
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const u = oneNode(work, input)
+  const { steps, push, why } = recorder(work, { u: u ?? 'None' })
   if (!u) {
     push('Type a node id, such as A.', S.def)
     why(WHY.needNode())
@@ -130,26 +130,33 @@ export function runSelectMpr(state: BroadcastState, input: unknown): Result {
   }
   const t = selectMpr(work, u)
   if (t.n1.length === 0) {
-    push(`${u} has no neighbors, so it needs no MPR.`, S.sets, { nodes: { [u]: 'current' } })
+    push(`${u} has no neighbors, so it needs no MPR.`, S.sets, { nodes: { [u]: 'current' } }, [], { n1: pySet([]) })
     why(WHY.alone(u))
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const sets = { ...marks(t.n1, 'current'), ...marks(t.n2, 'visited') }
   if (t.n2.length === 0) {
-    push(`${u} has one-hop neighbors ${listIds(t.n1)} and no two-hop neighbors.`, S.sets, { nodes: sets })
+    push(`${u} has one-hop neighbors ${listIds(t.n1)} and no two-hop neighbors.`, S.sets, { nodes: sets }, [], { n1: pySet(t.n1), n2: pySet([]) })
     why(WHY.noTwoHop(u))
-    push(`${u} needs no MPR: every node it can reach is one hop away.`, S.done)
+    push(`${u} needs no MPR: every node it can reach is one hop away.`, S.done, undefined, [], { mpr: pySet([]) })
     why(WHY.noMpr())
     return { steps, finalSnapshot: cloneNet(work) }
   }
-  push(`${u} has one-hop neighbors ${listIds(t.n1)} and two-hop neighbors ${listIds(t.n2)}.`, S.sets, { nodes: sets })
+  push(`${u} has one-hop neighbors ${listIds(t.n1)} and two-hop neighbors ${listIds(t.n2)}.`, S.sets, { nodes: sets }, [], {
+    n1: pySet(t.n1),
+    n2: pySet(t.n2),
+  })
   why(WHY.sets(u))
   const chosen: string[] = []
   for (const { c, n } of t.unique) {
     chosen.push(n)
-    push(`${c} is reachable only through ${n}, so ${n} becomes an MPR.`, S.unique, {
-      nodes: { ...marks(t.n2, 'visited'), [c]: 'current', ...marks(chosen, 'found') },
-    })
+    push(
+      `${c} is reachable only through ${n}, so ${n} becomes an MPR.`,
+      S.unique,
+      { nodes: { ...marks(t.n2, 'visited'), [c]: 'current', ...marks(chosen, 'found') } },
+      [],
+      { c, via: pySet([n]) },
+    )
     why(WHY.unique(u, c, n))
   }
   push(
@@ -158,13 +165,13 @@ export function runSelectMpr(state: BroadcastState, input: unknown): Result {
       : 'No two-hop neighbor has a single way in, so no MPR is fixed yet.',
     S.covered,
     { nodes: { ...marks(t.coveredAfterUnique, 'visited'), ...marks(chosen, 'found') } },
+    [],
+    { covered: pySet(t.coveredAfterUnique) },
   )
   why(t.coveredAfterUnique.length ? WHY.covered() : WHY.noneFixed())
   for (const { n, k } of t.greedy) {
     chosen.push(n)
-    push(`${n} covers ${k} of the uncovered two-hop neighbors, the most, so it becomes an MPR.`, S.pick, {
-      nodes: marks(chosen, 'found'),
-    })
+    push(`${n} covers ${k} of the uncovered two-hop neighbors, the most, so it becomes an MPR.`, S.pick, { nodes: marks(chosen, 'found') }, [], { n })
     why(WHY.greedy())
   }
   const rest = t.n1.filter((m) => !t.mpr.includes(m))
@@ -173,6 +180,8 @@ export function runSelectMpr(state: BroadcastState, input: unknown): Result {
       (rest.length ? `; ${listIds(rest)} ${rest.length === 1 ? 'stays' : 'stay'} silent.` : '; every neighbor is needed.'),
     S.done,
     { nodes: marks(t.mpr, 'found') },
+    [],
+    { mpr: pySet(t.mpr) },
   )
   why(rest.length ? WHY.done() : WHY.allNeeded())
   return { steps, finalSnapshot: cloneNet(work) }
@@ -181,8 +190,8 @@ export function runSelectMpr(state: BroadcastState, input: unknown): Result {
 export function runBroadcast(state: BroadcastState, input: unknown): Result {
   const B = L.broadcast
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const src = oneNode(work, input)
+  const { steps, push, why } = recorder(work, { src: src ?? 'None', packet: 'PKT' })
   if (!src) {
     push('Type a source node, such as A.', B.def)
     why(WHY.needSource())
@@ -200,11 +209,13 @@ export function runBroadcast(state: BroadcastState, input: unknown): Result {
   const tree: Record<string, HighlightKind> = {}
   const seen = new Set([src])
   const queue: [string, string | null][] = [[src, null]]
-  const vars = () => ({ tx: work.tx, dups: work.dups })
   while (queue.length) {
     const [v, heardFrom] = queue.shift()!
     if (heardFrom && mprRelay && !work.mpr[heardFrom]?.includes(v)) {
-      push(`${v} is not an MPR of ${heardFrom}, so it does not relay.`, B.silent, { nodes: { ...got }, links: { ...tree } })
+      push(`${v} is not an MPR of ${heardFrom}, so it does not relay.`, B.silent, { nodes: { ...got }, links: { ...tree } }, [], {
+        v,
+        heard_from: heardFrom,
+      })
       why(WHY.silent(v, heardFrom))
       continue
     }
@@ -215,13 +226,13 @@ export function runBroadcast(state: BroadcastState, input: unknown): Result {
       B.transmit,
       { nodes: { ...got, [v]: 'current' }, links: { ...tree } },
       [{ kind: 'PKT', from: v, to: '*' }],
-      vars(),
+      { v, heard_from: heardFrom ?? 'None' },
     )
     why(!nbrs.length ? WHY.noNeighbor(v) : v === src ? WHY.source(v) : mprRelay ? WHY.relayMpr(v) : WHY.relayFlood(v))
     for (const n of nbrs) {
       if (seen.has(n)) {
         work.dups += 1
-        push(`${n} already has the packet, so this copy is a duplicate.`, B.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...tree } }, [], vars())
+        push(`${n} already has the packet, so this copy is a duplicate.`, B.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...tree } }, [], { v, n })
         why(WHY.dup(n))
         continue
       }
@@ -231,7 +242,7 @@ export function runBroadcast(state: BroadcastState, input: unknown): Result {
       push(`${n} receives the packet for the first time.`, B.first, {
         nodes: { ...got, [n]: 'new' },
         links: { ...tree, [linkKey(v, n)]: 'new' },
-      }, [], vars())
+      }, [], { v, n })
       why(WHY.first(n))
       got[n] = 'visited'
       queue.push([n, v])
@@ -241,8 +252,6 @@ export function runBroadcast(state: BroadcastState, input: unknown): Result {
     `${work.reached} of ${plural(work.nodes.length - 1, 'other node')} received the packet with ${plural(work.tx, 'transmission')} and ${plural(work.dups, 'duplicate')}.`,
     B.loop,
     { nodes: { ...got }, links: { ...tree } },
-    [],
-    vars(),
   )
   why(WHY.total())
   return { steps, finalSnapshot: cloneNet(work) }
@@ -251,8 +260,8 @@ export function runBroadcast(state: BroadcastState, input: unknown): Result {
 export function runRemoveLink(state: BroadcastState, input: unknown): Result {
   const R = L.remove
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const ids = parseIds(input)
+  const { steps, push, why } = recorder(work, ids.length === 2 ? { u: ids[0], v: ids[1] } : { u: 'None', v: 'None' })
   if (ids.length !== 2) {
     push('Type a link, such as D F.', R.def)
     why(WHY.needLink())
@@ -277,9 +286,13 @@ export function runRemoveLink(state: BroadcastState, input: unknown): Result {
   }
   const show = (set: string[] | undefined) => (set?.length ? listIds(set) : 'none')
   for (const w of changed) {
-    push(`${w}'s MPR set changes from ${show(old[w])} to ${show(work.mpr[w])}.`, R.recompute, {
-      nodes: { [w]: 'current', ...marks(work.mpr[w], 'found') },
-    })
+    push(
+      `${w}'s MPR set changes from ${show(old[w])} to ${show(work.mpr[w])}.`,
+      R.recompute,
+      { nodes: { [w]: 'current', ...marks(work.mpr[w], 'found') } },
+      [],
+      { w },
+    )
     why(WHY.changed(w))
   }
   return { steps, finalSnapshot: cloneNet(work) }

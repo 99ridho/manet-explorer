@@ -184,10 +184,11 @@ function crossing(p1: Pt, p2: Pt, q1: Pt, q2: Pt): Pt | null {
 export function runRoute(state: GeoState, input: unknown): Result {
   const R = L.route
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const ids = parseIds(input)
   const known = new Set(work.nodes.map((n) => n.id))
-  if (ids.length !== 2 || ids[0] === ids[1] || !ids.every((id) => known.has(id))) {
+  const valid = ids.length === 2 && ids[0] !== ids[1] && ids.every((id) => known.has(id))
+  const { steps, push, why } = recorder(work, { src: valid ? ids[0] : 'None', dst: valid ? ids[1] : 'None', recovery: `'${work.recovery}'` })
+  if (!valid) {
     push('Type a source and a destination, such as S D.', R.def)
     why(WHY.needPair())
     return { steps, finalSnapshot: cloneNet(work) }
@@ -200,7 +201,7 @@ export function runRoute(state: GeoState, input: unknown): Result {
   work.mode = 'greedy'
   work.hops = 0
   work.path = [src]
-  const vars = () => ({ dist: fmt(dTo(work.flow!.at)) })
+  const vars = (locals: Record<string, string> = {}) => ({ ...locals, dist: fmt(dTo(work.flow!.at)) })
 
   const planar = gabriel(work)
   const radio = work.links.filter((l) => !l.virtual && !l.broken)
@@ -249,7 +250,7 @@ export function runRoute(state: GeoState, input: unknown): Result {
           R.greedy,
           view(n),
           [{ kind: 'DATA', from: v, to: n }],
-          vars(),
+          vars({ n }),
         )
         why(WHY.greedy(dst))
         v = n
@@ -268,12 +269,12 @@ export function runRoute(state: GeoState, input: unknown): Result {
           R.void,
           view(v, 'flagged'),
           [],
-          vars(),
+          vars({ stuck: v }),
         )
         why(WHY.void(v, dst))
         continue
       }
-      push(`No neighbor of ${v} is closer to ${dst} than ${v} itself, so greedy forwarding drops the packet.`, R.drop, view(v, 'dropped'), [], vars())
+      push(`No neighbor of ${v} is closer to ${dst} than ${v} itself, so greedy forwarding drops the packet.`, R.drop, view(v, 'dropped'), [], vars({ v }))
       why(WHY.drop(v))
       return { steps, finalSnapshot: cloneNet(work) }
     }
@@ -290,7 +291,7 @@ export function runRoute(state: GeoState, input: unknown): Result {
     }
     const again = n !== null && v === stuck && n === firstHop
     if (n === null || again || walkHops >= maxWalk) {
-      push(`The perimeter walk came back to ${stuck} without getting closer, so ${dst} is unreachable.`, R.stuck, view(v, 'dropped'), [], vars())
+      push(`The perimeter walk came back to ${stuck} without getting closer, so ${dst} is unreachable.`, R.stuck, view(v, 'dropped'), [], vars({ v, stuck }))
       why(WHY.stuck(dst))
       return { steps, finalSnapshot: cloneNet(work) }
     }
@@ -304,14 +305,14 @@ export function runRoute(state: GeoState, input: unknown): Result {
       R.perimeter,
       view(n),
       [{ kind: 'DATA', from: v, to: n }],
-      vars(),
+      vars({ prev: v, n }),
     )
     why(skipped ? WHY.faceChange(dst) : WHY.perimeter())
     prev = v
     v = n
     if (v !== dst && dTo(v) < dTo(stuck) - 1e-9) {
       work.mode = 'greedy'
-      push(`${v} is ${fmt(dTo(v))} from ${dst}, closer than ${stuck} was, so the packet returns to greedy mode.`, R.resume, view(v), [], vars())
+      push(`${v} is ${fmt(dTo(v))} from ${dst}, closer than ${stuck} was, so the packet returns to greedy mode.`, R.resume, view(v), [], vars({ v, stuck }))
       why(WHY.resume(v))
     }
   }

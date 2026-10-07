@@ -132,9 +132,9 @@ export function runDiscover(state: SarState, input: unknown): Result {
   const D = L.discover
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push, why } = recorder(work)
   const at = (focus: Focus) => (work.focus = focus)
   const src = teamRadio(work, input)
+  const { steps, push, why } = recorder(work, { src: src ?? 'None', gateway: GATEWAY })
   if (!src) {
     at('topology')
     push('Type a team radio: T1, T2, or T3.', D.def)
@@ -154,12 +154,11 @@ export function runDiscover(state: SarState, input: unknown): Result {
   const reached: Record<string, HighlightKind> = {}
   const seen = new Set([src])
   const queue: [string, string | null][] = [[src, null]]
-  const vars = () => ({ tx: work.tx, dupes: work.dupes })
   while (queue.length) {
     const [v, from] = queue.shift()!
     if (v === GATEWAY) continue
     if (from !== null && mpr && !work.mpr[from]?.includes(v)) {
-      push(`${v} is not an MPR of ${from}, so it does not relay.`, D.silent, { nodes: { ...got }, links: { ...reached } }, [], vars())
+      push(`${v} is not an MPR of ${from}, so it does not relay.`, D.silent, { nodes: { ...got }, links: { ...reached } }, [], { v, heard_from: from })
       why(WHY.silent(v, from))
       continue
     }
@@ -168,20 +167,20 @@ export function runDiscover(state: SarState, input: unknown): Result {
     work.txBy = { ...work.txBy, [v]: (work.txBy[v] ?? 0) + 1 }
     push(`${v} transmits the RREQ to ${listIds(nbrs)}.`, D.transmit, { nodes: { ...got, [v]: 'current' }, links: { ...reached } }, [
       { kind: 'RREQ', from: v, to: '*' },
-    ], vars())
+    ], { v, heard_from: from ?? 'None' })
     why(v === src ? WHY.transmitSrc(v) : mpr ? WHY.transmitMpr(v) : WHY.transmitFlood(v))
     for (const n of nbrs) {
       if (seen.has(n)) {
         work.dupes += 1
         work.dupBy = { ...work.dupBy, [n]: (work.dupBy[n] ?? 0) + 1 }
-        push(`${n} already has the RREQ, so this copy is a duplicate.`, D.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...reached } }, [], vars())
+        push(`${n} already has the RREQ, so this copy is a duplicate.`, D.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...reached } }, [], { v, n })
         why(WHY.dup(n))
         continue
       }
       seen.add(n)
       work.reverse = { ...work.reverse, [n]: v }
       reached[linkKey(v, n)] = 'tree'
-      push(`${n} records ${v} as its way back to ${src}.`, D.first, { nodes: { ...got, [n]: 'new' }, links: { ...reached, [linkKey(v, n)]: 'new' } }, [], vars())
+      push(`${n} records ${v} as its way back to ${src}.`, D.first, { nodes: { ...got, [n]: 'new' }, links: { ...reached, [linkKey(v, n)]: 'new' } }, [], { v, n })
       why(WHY.first(n, src))
       got[n] = 'visited'
       queue.push([n, v])
@@ -219,8 +218,8 @@ export function runSend(state: SarState, input: unknown): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'route'
-  const { steps, push, why } = recorder(work)
   const src = teamRadio(work, input)
+  const { steps, push, why } = recorder(work, { src: src ?? 'None', dst: GATEWAY, payload: 'report' })
   if (!src) {
     push('Type a team radio: T1, T2, or T3.', S.def)
     why(WHY.needTeam())
@@ -235,12 +234,12 @@ export function runSend(state: SarState, input: unknown): Result {
   const done: Record<string, HighlightKind> = {}
   for (let i = 0; i + 1 < route.length; i++) {
     const [v, nxt] = [route[i], route[i + 1]]
-    push(`${v} looks up G in its table: next hop ${nxt}.`, S.lookup, { nodes: { [v]: 'current' }, links: { ...done }, path: route })
+    push(`${v} looks up G in its table: next hop ${nxt}.`, S.lookup, { nodes: { [v]: 'current' }, links: { ...done }, path: route }, [], { v, nxt })
     why(WHY.lookup(v))
     done[linkKey(v, nxt)] = 'tree'
     push(`The report moves from ${v} to ${nxt}.`, S.forward, { nodes: { [nxt]: 'current' }, links: { ...done }, path: route }, [
       { kind: 'DATA', from: v, to: nxt },
-    ])
+    ], { v, nxt })
     why(WHY.forward(v, nxt))
   }
   push(`The report reaches G after ${plural(route.length - 1, 'hop')}.`, S.done, { nodes: { [GATEWAY]: 'found' }, links: { ...done }, path: route })
@@ -252,9 +251,9 @@ export function runWalkAway(state: SarState, input: unknown): Result {
   const W = L.walk
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push, why } = recorder(work)
   const ids = parseIds(input)
   const u = ids.length === 1 && ids[0] !== GATEWAY && work.nodes.some((n) => n.id === ids[0] && !n.down) ? ids[0] : null
+  const { steps, push, why } = recorder(work, { u: u ?? 'None' })
   work.focus = 'topology'
   if (!u) {
     push('Type a radio on the slope, such as R2.', W.def)
@@ -278,12 +277,14 @@ export function runWalkAway(state: SarState, input: unknown): Result {
     const src = route[0]
     if (at > 0) {
       const up = route[at - 1]
-      push(`${up} sends an RERR toward ${src}.`, W.rerr, { nodes: { [up]: 'current' } }, up === src ? [] : [{ kind: 'RERR', from: up, to: route[at - 2] }])
+      push(`${up} sends an RERR toward ${src}.`, W.rerr, { nodes: { [up]: 'current' } }, up === src ? [] : [{ kind: 'RERR', from: up, to: route[at - 2] }], {
+        node: up,
+      })
       why(WHY.rerr(src))
     }
     for (let i = at - 1; i >= 0; i--) {
       const n = route[i]
-      push(`${n} deletes its route to G, which went through ${u}.`, W.remove, { nodes: { [n]: 'dropped' } })
+      push(`${n} deletes its route to G, which went through ${u}.`, W.remove, { nodes: { [n]: 'dropped' } }, [], { node: n })
       why(WHY.delete(n))
       const next = { ...work.route }
       delete next[n]
@@ -313,7 +314,7 @@ export function runMetrics(state: SarState): Result {
   const work = cloneNet(state)
   delete work.metrics
   work.focus = 'route'
-  const { steps, push, why } = recorder(work)
+  const { steps, push, why } = recorder(work, { seed: 'None' })
   const net = { nodes: work.nodes, links: work.links }
   const order: Relay[] = work.relay === 'mpr' ? ['mpr', 'flooding'] : ['flooding', 'mpr']
   const flows = TEAM.filter((t) => work.nodes.some((n) => n.id === t && !n.down)).map((src) => ({ src, dst: GATEWAY, packets: 5 }))

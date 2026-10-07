@@ -1,5 +1,5 @@
 // SPEC.md §10.7: Buddy pool splitting and query-based DAD, with a crash leak and a partition merge.
-import { cloneNet, linkKey, listIds, makeLink, neighbors, parseIds, plural, recorder, removeNode } from '@/lib/net'
+import { cloneNet, linkKey, listIds, makeLink, neighbors, parseIds, plural, pyList, recorder, removeNode } from '@/lib/net'
 import { dist } from '@/lib/sim/geometry'
 import { freeSpot } from '@/lib/sim/placement'
 import { mulberry32, randInt, type Rng } from '@/lib/sim/rng'
@@ -80,6 +80,8 @@ export function randomNetwork(scheme: Scheme, seed: number): AddressSnapshot {
 const size = (r: Range) => r[1] - r[0] + 1
 const largest = (pool: Range[]) => pool.reduce((m, r) => Math.max(m, size(r)), 0)
 const rangeText = (r: Range) => (r[0] === r[1] ? `${r[0]}` : `${r[0]} to ${r[1]}`)
+/** "(9, 16)": a range as a step variable, the tuple the listing splits. */
+const rangeTuple = (r: Range) => `(${r[0]}, ${r[1]})`
 const rangesText = (pool: Range[]) => pool.map(rangeText).join(', ')
 
 /** Sorted, with ranges that touch or overlap joined into one. */
@@ -137,16 +139,18 @@ function addNode(s: AddressSnapshot, fresh: string, via: string) {
 /** The Buddy split of lines 2 to 8; `x` already sits in the network, linked to `via`. */
 function buddySplit(work: AddressSnapshot, push: Push, why: Why, x: string, via: string, line?: number): boolean {
   const J = L.joinBuddy
+  // Inside merge's listing the split's own names do not appear; its line 7 binds x and via.
+  const at = (own: Record<string, string | number>) => (line === undefined ? own : { x, via })
   const hl = (kind: HighlightKind) => ({ nodes: { [via]: 'current' as HighlightKind, [x]: kind }, links: { [linkKey(x, via)]: 'active' as HighlightKind } })
   const pool = work.pool[via]
   if (largest(pool) <= 1) {
-    push(`${via} has no range left to split, so ${x} cannot join through it.`, line ?? J.full, hl('dropped'))
+    push(`${via} has no range left to split, so ${x} cannot join through it.`, line ?? J.full, hl('dropped'), [], at({}))
     why(WHY.full(via))
     return false
   }
   const target = pool.reduce((best, r) => (size(r) > size(best) ? r : best))
   const [lo, hi] = target
-  push(`${via} splits ${rangeText(target)} in half.`, line ?? J.split, hl('new'))
+  push(`${via} splits ${rangeText(target)} in half.`, line ?? J.split, hl('new'), [], at({ lo, hi }))
   why(WHY.split(via))
   const mid = Math.floor((lo + hi) / 2)
   let keep: Range = [lo, mid]
@@ -155,10 +159,10 @@ function buddySplit(work: AddressSnapshot, push: Push, why: Why, x: string, via:
   if (own != null && own > mid && own <= hi) [keep, give] = [give, keep]
   work.pool[via] = pool.map((r) => (r === target ? keep : r))
   work.pool[x] = [give]
-  push(`${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${x}.`, line ?? J.hand, hl('new'))
+  push(`${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${x}.`, line ?? J.hand, hl('new'), [], at({ keep: rangeTuple(keep), give: rangeTuple(give) }))
   why(WHY.hand(via))
   work.address[x] = give[0]
-  push(`${x} takes address ${give[0]} without asking any other node.`, line ?? J.address, { nodes: { [x]: 'found' } })
+  push(`${x} takes address ${give[0]} without asking any other node.`, line ?? J.address, { nodes: { [x]: 'found' } }, [], at({ give: rangeTuple(give) }))
   why(WHY.address(x))
   return true
 }
@@ -179,46 +183,58 @@ function reach(work: AddressSnapshot, x: string): Map<string, number> {
 }
 
 /** The QDAD loop of lines 2 to 13 for node x, drawing addresses from `rng`. */
-function qdadPick(work: AddressSnapshot, push: Push, why: Why, x: string, rng: Rng, line?: number) {
+function qdadPick(work: AddressSnapshot, push: Push, why: Why, x: string, via: string, rng: Rng, line?: number) {
   const Q = L.joinQdad
+  const at = (own: Record<string, string | number>) => (line === undefined ? own : { x, via })
   let a = randInt(rng, 1, SPACE)
-  push(`${x} picks address ${a} at random.`, line ?? Q.pick, { nodes: { [x]: 'current' } })
+  push(`${x} picks address ${a} at random.`, line ?? Q.pick, { nodes: { [x]: 'current' } }, [], at({ a }))
   why(WHY.pick(x))
   let tries = 0
   for (let picks = 0; tries < QDAD_TRIES && picks < 50; ) {
     const hops = reach(work, x)
     work.control += hops.size
-    push(`${x} floods AREQ ${a} (try ${tries + 1} of ${QDAD_TRIES}).`, line ?? Q.flood, { nodes: { [x]: 'current' } }, [
-      { kind: 'AREQ', from: x, to: '*', label: `${a}` },
-    ])
+    push(
+      `${x} floods AREQ ${a} (try ${tries + 1} of ${QDAD_TRIES}).`,
+      line ?? Q.flood,
+      { nodes: { [x]: 'current' } },
+      [{ kind: 'AREQ', from: x, to: '*', label: `${a}` }],
+      at({ a, tries }),
+    )
     why(WHY.flood(x, a))
     const owner = work.nodes.map((n) => n.id).find((n) => n !== x && hops.has(n) && work.address[n] === a)
     if (owner) {
       work.control += hops.get(owner)!
-      push(`${owner} already uses ${a}, so it answers with an AREP and ${x} picks again.`, line ?? Q.owner, {
-        nodes: { [x]: 'current', [owner]: 'flagged' },
-      })
+      push(
+        `${owner} already uses ${a}, so it answers with an AREP and ${x} picks again.`,
+        line ?? Q.owner,
+        { nodes: { [x]: 'current', [owner]: 'flagged' } },
+        [],
+        at({ a, owner }),
+      )
       why(WHY.owner(owner, x))
       a = randInt(rng, 1, SPACE)
       picks += 1
       tries = 0
-      push(`${x} picks address ${a} at random.`, line ?? Q.repick, { nodes: { [x]: 'current' } })
+      push(`${x} picks address ${a} at random.`, line ?? Q.repick, { nodes: { [x]: 'current' } }, [], at({ a }))
       why(WHY.repick(x))
     } else {
       tries += 1
-      push(`Nobody answers try ${tries}.`, line ?? Q.silence, { nodes: { [x]: 'current' } })
+      push(`Nobody answers try ${tries}.`, line ?? Q.silence, { nodes: { [x]: 'current' } }, [], at({ a, tries }))
       why(WHY.silence(x))
     }
   }
   work.address[x] = a
-  push(`Three AREQs got no answer, so ${x} takes address ${a}.`, line ?? Q.take, { nodes: { [x]: 'found' } })
+  push(`Three AREQs got no answer, so ${x} takes address ${a}.`, line ?? Q.take, { nodes: { [x]: 'found' } }, [], at({ a }))
   why(WHY.take(x))
 }
 
+/** join's new and via, or None when the input names no valid pair. */
+const joinArgs = (p: { fresh: string; via: string } | null) => ({ new: p?.fresh ?? 'None', via: p?.via ?? 'None' })
+
 export function runJoinBuddy(state: AddressState, input: unknown): Result {
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const parsed = parseJoin(work, input)
+  const { steps, push, why } = recorder(work, joinArgs(parsed))
   if (!parsed) {
     push('Type a new node id and a configured neighbor, such as D C.', L.joinBuddy.def)
     why(WHY.joinInput())
@@ -238,8 +254,8 @@ export function runJoinBuddy(state: AddressState, input: unknown): Result {
 
 export function runJoinQdad(state: AddressState, input: unknown): Result {
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const parsed = parseJoin(work, input)
+  const { steps, push, why } = recorder(work, joinArgs(parsed))
   if (!parsed) {
     push('Type a new node id and a configured neighbor, such as D C.', L.joinQdad.def)
     why(WHY.joinInput())
@@ -247,7 +263,7 @@ export function runJoinQdad(state: AddressState, input: unknown): Result {
   }
   addNode(work, parsed.fresh, parsed.via)
   const rng = mulberry32(work.seed)
-  qdadPick(work, push, why, parsed.fresh, rng)
+  qdadPick(work, push, why, parsed.fresh, parsed.via, rng)
   work.seed = Math.floor(rng() * 1_000_000) + 1
   return { steps, finalSnapshot: cloneNet(work) }
 }
@@ -260,8 +276,8 @@ function oneNode(s: AddressSnapshot, input: unknown): string | null {
 export function runLeaveBuddy(state: AddressState, input: unknown): Result {
   const V = L.leaveBuddy
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const u = oneNode(work, input)
+  const { steps, push, why } = recorder(work, { u: u ?? 'None' })
   if (!u) {
     push('Type a node id, such as C.', V.def)
     why(WHY.needNode())
@@ -277,12 +293,10 @@ export function runLeaveBuddy(state: AddressState, input: unknown): Result {
   const touches = (other: Range[]) => other.some((r) => mine.some((m) => r[1] + 1 === m[0] || m[1] + 1 === r[0]))
   const b = nbrs.find((n) => touches(work.pool[n])) ?? nbrs[0]
   const hl = { nodes: { [u]: 'current' as HighlightKind, [b]: 'new' as HighlightKind }, links: { [linkKey(u, b)]: 'active' as HighlightKind } }
-  push(`${u} says goodbye and hands ${mine.length ? rangesText(mine) : 'no range'} to ${b}.`, V.hand, hl, [
-    { kind: 'BYE', from: u, to: b },
-  ])
+  push(`${u} says goodbye and hands ${mine.length ? rangesText(mine) : 'no range'} to ${b}.`, V.hand, hl, [{ kind: 'BYE', from: u, to: b }], { b })
   why(WHY.handBack(u))
   work.pool[b] = mergeTouching([...work.pool[b], ...mine])
-  push(`${b} now holds ${rangesText(work.pool[b])}.`, V.hand, hl)
+  push(`${b} now holds ${rangesText(work.pool[b])}.`, V.hand, hl, [], { b })
   why(WHY.merged(b))
   removeNode(work, u)
   delete work.address[u]
@@ -295,8 +309,8 @@ export function runLeaveBuddy(state: AddressState, input: unknown): Result {
 export function runCrashBuddy(state: AddressState, input: unknown): Result {
   const C = L.crash
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const u = oneNode(work, input)
+  const { steps, push, why } = recorder(work, { u: u ?? 'None' })
   if (!u) {
     push('Type a node id, such as C.', C.def)
     why(WHY.needNode())
@@ -320,7 +334,7 @@ export function runCrashBuddy(state: AddressState, input: unknown): Result {
 export function runMerge(state: AddressState): Result {
   const M = L.merge
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
+  const { steps, push, why } = recorder(work, { partition: pyList(work.partition.nodes.map((n) => n.id)) })
   if (work.merged || work.partition.nodes.length === 0 || work.nodes.length === 0) {
     push('The partition has already merged.', M.def)
     why(WHY.alreadyMerged())
@@ -355,19 +369,19 @@ export function runMerge(state: AddressState): Result {
   const rng = mulberry32(work.seed)
   for (const { a, x, y } of pairs) {
     work.conflicts += 1
-    push(`${y} and ${x} both use address ${a}.`, M.conflict, { nodes: { [x]: 'flagged', [y]: 'flagged' } })
+    push(`${y} and ${x} both use address ${a}.`, M.conflict, { nodes: { [x]: 'flagged', [y]: 'flagged' } }, [], { a })
     why(WHY.conflict(x))
     work.pool[x] = []
     work.address[x] = null
     pending.delete(x)
     const via = neighbors(work, x).find((n) => !pending.has(n) && work.address[n] != null)
     if (!via) {
-      push(`${x} has no configured neighbor to join through.`, M.rejoin, { nodes: { [x]: 'dropped' } })
+      push(`${x} has no configured neighbor to join through.`, M.rejoin, { nodes: { [x]: 'dropped' } }, [], { x, via: 'None' })
       why(WHY.noVia(x))
       continue
     }
     if (work.scheme === 'buddy') buddySplit(work, push, why, x, via, M.rejoin)
-    else qdadPick(work, push, why, x, rng, M.rejoin)
+    else qdadPick(work, push, why, x, via, rng, M.rejoin)
   }
   work.seed = Math.floor(rng() * 1_000_000) + 1
   push(

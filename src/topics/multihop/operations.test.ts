@@ -71,7 +71,7 @@ describe('find bridges', () => {
       'low[D] = 4 is not less than disc[C] = 3, so removing C cuts D off: C is an articulation point.',
     ])
     expect(lines(steps)).not.toContain(20)
-    expect(steps[5].variables).toEqual({ disc: 'A:1 B:2 C:3', low: 'A:1 B:2 C:1' })
+    expect(steps[5].variables).toEqual({ v: 'C', parent: 'B', w: 'A', disc: 'A:1 B:2 C:3', low: 'A:1 B:2 C:1' })
   })
 
   it('reports nothing on a network without bridges', () => {

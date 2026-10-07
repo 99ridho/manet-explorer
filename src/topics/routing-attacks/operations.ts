@@ -1,6 +1,6 @@
 // SPEC.md §10.11: DSR-style discovery under a black hole or a wormhole, sending, and the watchdog.
 import { floodRreq } from '@/lib/dsr-flood'
-import { cloneNet, findLink, linkKey, listIds, makeLink, recorder } from '@/lib/net'
+import { cloneNet, findLink, linkKey, listIds, makeLink, pyList, recorder } from '@/lib/net'
 import type { HighlightKind } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
@@ -74,7 +74,7 @@ export function runDiscover(state: AttackState): Result {
   const work = cloneNet(state)
   work.routes = []
   work.route = null
-  const { steps, push, why } = recorder(work)
+  const { steps, push, why } = recorder(work, { src: SRC, dst: DST })
   const rules = { blackHole: (id: string) => isBlackHole(work, id), farEnd: (id: string) => farEnd(work, id) }
   work.routes = floodRreq(work, SRC, DST, rules, push, why, D).routes
   if (work.routes.length === 0) {
@@ -83,7 +83,9 @@ export function runDiscover(state: AttackState): Result {
     return { steps, finalSnapshot: cloneNet(work) }
   }
   work.route = work.routes[0]
-  push(`${SRC} uses the first route to arrive: ${listIds(work.route)}.`, D.pick, { links: tree(work.route), path: work.route })
+  push(`${SRC} uses the first route to arrive: ${listIds(work.route)}.`, D.pick, { links: tree(work.route), path: work.route }, [], {
+    route: pyList(work.route),
+  })
   why(WHY.pick())
   return { steps, finalSnapshot: cloneNet(work) }
 }
@@ -98,8 +100,8 @@ const isTunnel = (s: AttackSnapshot, a: string, b: string) => !!findLink(s, a, b
 export function runSend(state: AttackState, input: unknown): Result {
   const S = L.send
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const k = packetsFrom(input)
+  const { steps, push, why } = recorder(work, { route: work.route ? pyList(work.route) : 'None', k: k ?? 'None' })
   if (k === null) {
     push('Type a number of packets from 1 to 20.', S.def)
     why(WHY.packets())
@@ -120,7 +122,7 @@ export function runSend(state: AttackState, input: unknown): Result {
       if (isBlackHole(work, v)) {
         delivered = false
         work.dropped += 1
-        push(`${v} drops packet ${p} without a trace.`, S.drop, { nodes: { [v]: 'dropped' }, links: tree(route) })
+        push(`${v} drops packet ${p} without a trace.`, S.drop, { nodes: { [v]: 'dropped' }, links: tree(route) }, [], { p, v })
         why(WHY.drop(v))
         break
       }
@@ -128,7 +130,7 @@ export function runSend(state: AttackState, input: unknown): Result {
         work.tunneled += 1
         push(`Packet ${p} crosses the tunnel from ${v} to ${nxt}.`, S.tunnel, { links: { ...tree(route), [linkKey(v, nxt)]: 'active' } }, [
           { kind: 'DATA', from: v, to: nxt, label: `${p}` },
-        ])
+        ], { p, v, nxt })
         why(WHY.tunnel())
       }
     }
@@ -136,7 +138,7 @@ export function runSend(state: AttackState, input: unknown): Result {
       work.delivered += 1
       push(`Packet ${p} reaches ${DST}.`, S.done, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [
         { kind: 'DATA', from: route[route.length - 2], to: DST, label: `${p}` },
-      ])
+      ], { p, delivered: 'True' })
       why(WHY.delivered())
     }
   }
@@ -146,8 +148,8 @@ export function runSend(state: AttackState, input: unknown): Result {
 export function runWatchdog(state: AttackState, input: unknown): Result {
   const W = L.watchdog
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const k = packetsFrom(input)
+  const { steps, push, why } = recorder(work, { src: SRC, route: work.route ? pyList(work.route) : 'None', k: k ?? 'None' })
   if (k === null) {
     push('Type a number of packets from 1 to 20.', W.def)
     why(WHY.packets())
@@ -169,7 +171,7 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
         work.delivered += 1
         push(`Packet ${p} reaches ${DST}.`, W.heard, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [
           { kind: 'DATA', from: v, to: nxt, label: `${p}` },
-        ])
+        ], { p, v, nxt })
         why(WHY.delivered())
         break
       }
@@ -177,20 +179,24 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
       if (!isBlackHole(work, nxt)) {
         push(`${v} hears ${nxt} forward packet ${p}.`, W.heard, { links: { [linkKey(v, nxt)]: 'tree' } }, [
           { kind: 'DATA', from: v, to: nxt, label: `${p}` },
-        ])
+        ], { p, v, nxt })
         why(WHY.heard(v, nxt))
         continue
       }
       work.dropped += 1
       const f = (work.failures[nxt] ?? 0) + 1
       work.failures = { ...work.failures, [nxt]: f }
-      push(`${v} never hears ${nxt} forward packet ${p}: ${f} ${f === 1 ? 'failure' : 'failures'} for ${nxt}.`, W.silence, {
-        nodes: { [nxt]: 'flagged' },
-      })
+      push(
+        `${v} never hears ${nxt} forward packet ${p}: ${f} ${f === 1 ? 'failure' : 'failures'} for ${nxt}.`,
+        W.silence,
+        { nodes: { [nxt]: 'flagged' } },
+        [],
+        { p, v, nxt },
+      )
       why(WHY.silence(v, nxt))
       if (f > THRESHOLD && !work.flagged.includes(nxt)) {
         work.flagged = [...work.flagged, nxt]
-        push(`${nxt} passed the threshold of ${THRESHOLD}, so ${v} reports it${v === SRC ? '' : ` to ${SRC}`}.`, W.report, { nodes: { [nxt]: 'flagged' } })
+        push(`${nxt} passed the threshold of ${THRESHOLD}, so ${v} reports it${v === SRC ? '' : ` to ${SRC}`}.`, W.report, { nodes: { [nxt]: 'flagged' } }, [], { nxt })
         why(WHY.report(v, nxt))
         const other = work.routes.find((r) => !r.includes(nxt)) ?? null
         work.route = other
@@ -200,6 +206,8 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
             : `The pathrater avoids ${nxt}, but ${SRC} has no other route.`,
           W.reroute,
           other ? { links: tree(other), path: other } : { nodes: { [nxt]: 'flagged' } },
+          [],
+          { nxt },
         )
         why(other ? WHY.reroute(nxt) : WHY.noOther())
       }

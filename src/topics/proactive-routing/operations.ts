@@ -79,19 +79,23 @@ function setRow(s: DsdvSnapshot, node: string, row: DsdvRow) {
   s.tables[node] = [...rest, row].sort((a, b) => a.dest.localeCompare(b.dest))
 }
 
+type Vars = Record<string, string>
+
 /**
  * One advertisement from `u`, narrated at `line` (or at the Advertise lines when null).
+ * Inside move's listing, `outer` replaces advertise's own step variables.
  * Returns the neighbors whose tables changed, in node order.
  */
-function advertise(work: DsdvSnapshot, push: Push, why: Why, u: string, line: number | null): string[] {
+function advertise(work: DsdvSnapshot, push: Push, why: Why, u: string, line: number | null, outer: Vars = {}): string[] {
   const A = L.advertise
   const at = (l: number) => line ?? l
+  const vars = (own: Vars) => (line === null ? own : outer)
   const full = work.update === 'full'
   const rows = work.tables[u].filter((r) => full || r.changed).map((r) => ({ ...r }))
   const nbrs = neighbors(work, u)
   work.shown = u
   if (rows.length === 0) {
-    push(`${u} has no changed rows, so the incremental update is empty.`, at(A.send), { nodes: { [u]: 'current' } })
+    push(`${u} has no changed rows, so the incremental update is empty.`, at(A.send), { nodes: { [u]: 'current' } }, [], vars({}))
     why(WHY.empty(u))
     return []
   }
@@ -104,20 +108,31 @@ function advertise(work: DsdvSnapshot, push: Push, why: Why, u: string, line: nu
     at(A.send),
     { nodes: { [u]: 'current' } },
     [{ kind: 'UPDATE', from: u, to: '*', label: plural(rows.length, 'row') }],
+    vars({}),
   )
   why(full ? WHY.sendFull(u) : WHY.sendChanged(u))
-  const changed = receive(work, push, why, u, nbrs, rows, line)
+  const changed = receive(work, push, why, u, nbrs, rows, line, outer)
   for (const r of work.tables[u]) r.changed = false
   work.shown = u
-  push(`${u} sent ${plural(rows.length, 'row')} to ${plural(nbrs.length, 'neighbor')}.`, at(A.done))
+  push(`${u} sent ${plural(rows.length, 'row')} to ${plural(nbrs.length, 'neighbor')}.`, at(A.done), undefined, [], vars({}))
   why(WHY.sent(u))
   return changed
 }
 
 /** Lines 4 to 11: every receiver weighs every row. Returns the receivers whose tables changed. */
-function receive(work: DsdvSnapshot, push: Push, why: Why, u: string, receivers: string[], rows: DsdvRow[], line: number | null): string[] {
+function receive(
+  work: DsdvSnapshot,
+  push: Push,
+  why: Why,
+  u: string,
+  receivers: string[],
+  rows: DsdvRow[],
+  line: number | null,
+  outer: Vars,
+): string[] {
   const A = L.advertise
   const at = (l: number) => line ?? l
+  const vars = (own: Vars) => (line === null ? own : outer)
   const changed: string[] = []
   for (const n of receivers) {
     for (const r of rows) {
@@ -125,14 +140,15 @@ function receive(work: DsdvSnapshot, push: Push, why: Why, u: string, receivers:
       const m = r.metric + 1
       const route = { dest: r.dest, next: u, metric: m, seq: r.seq, changed: true }
       const mark = { nodes: { [n]: 'new' as const, [u]: 'current' as const }, links: { [linkKey(u, n)]: 'active' as const } }
+      const own = vars({ n })
       work.shown = n
       if (!old) {
         setRow(work, n, route)
-        push(`${n} had no route to ${r.dest}, so it adds one via ${u}: ${plural(m, 'hop')}.`, at(A.newer), mark)
+        push(`${n} had no route to ${r.dest}, so it adds one via ${u}: ${plural(m, 'hop')}.`, at(A.newer), mark, [], own)
         why(WHY.added(n, u, r.dest))
       } else if (r.seq > old.seq) {
         setRow(work, n, route)
-        push(`${n} takes the route to ${r.dest} via ${u}: sequence ${r.seq} is newer than ${old.seq}.`, at(A.newer), mark)
+        push(`${n} takes the route to ${r.dest} via ${u}: sequence ${r.seq} is newer than ${old.seq}.`, at(A.newer), mark, [], own)
         why(WHY.newer(n, r.dest))
       } else if (r.seq === old.seq && m < old.metric) {
         setRow(work, n, route)
@@ -140,10 +156,12 @@ function receive(work: DsdvSnapshot, push: Push, why: Why, u: string, receivers:
           `Sequence ${r.seq} for ${r.dest} is the same, and via ${u} it is ${plural(m, 'hop')} instead of ${old.metric}, so ${n} switches.`,
           at(A.fewer),
           mark,
+          [],
+          own,
         )
         why(WHY.fewer(n))
       } else {
-        push(`${n} keeps its route to ${r.dest} via ${old.next}.`, at(A.keep))
+        push(`${n} keeps its route to ${r.dest} via ${old.next}.`, at(A.keep), undefined, [], own)
         why(WHY.keep(n, u, r.dest))
         continue
       }
@@ -155,8 +173,8 @@ function receive(work: DsdvSnapshot, push: Push, why: Why, u: string, receivers:
 
 export function runAdvertise(state: DsdvState, input: unknown): Result {
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const [u] = parseIds(input)
+  const { steps, push, why } = recorder(work, { u: u && work.tables[u] ? u : 'None', full_dump: work.update === 'full' ? 'True' : 'False' })
   if (!u || !work.tables[u]) {
     push(`There is no node ${u ?? 'by that name'} in this network.`, L.advertise.def)
     why(WHY.unknown())
@@ -169,10 +187,15 @@ export function runAdvertise(state: DsdvState, input: unknown): Result {
 export function runMove(state: DsdvState, input: unknown): Result {
   const M = L.move
   const work = cloneNet(state)
-  const { steps, push, why } = recorder(work)
   const ids = parseIds(input)
   const [u, near] = ids
-  if (ids.length !== 2 || u === near || !work.tables[u] || !work.tables[near]) {
+  const valid = ids.length === 2 && u !== near && !!work.tables[u] && !!work.tables[near]
+  const { steps, push, why } = recorder(work, {
+    u: valid ? u : 'None',
+    near: valid ? near : 'None',
+    full_dump: work.update === 'full' ? 'True' : 'False',
+  })
+  if (!valid) {
     push('Type the node that moves and the node it moves next to, such as M3 M6.', M.def)
     why(WHY.moveInput())
     return { steps, finalSnapshot: cloneNet(work) }
@@ -203,7 +226,7 @@ export function runMove(state: DsdvState, input: unknown): Result {
     const gone = [...new Set(stale.map((r) => r.next))]
     work.tables[v] = work.tables[v].filter((r) => !stale.includes(r))
     work.shown = v
-    push(`${v} deletes ${plural(stale.length, 'route')} that went through ${listIds(gone)}.`, M.stale, { nodes: { [v]: 'current' } })
+    push(`${v} deletes ${plural(stale.length, 'route')} that went through ${listIds(gone)}.`, M.stale, { nodes: { [v]: 'current' } }, [], { v })
     why(WHY.stale(v))
   }
 
@@ -220,9 +243,9 @@ export function runMove(state: DsdvState, input: unknown): Result {
     work.shown = n
     push(`${n} is a new neighbor, so it sends ${u} its full table of ${plural(rows.length, 'row')}.`, M.full, { nodes: { [n]: 'current' } }, [
       { kind: 'UPDATE', from: n, to: u, label: plural(rows.length, 'row') },
-    ])
+    ], { n })
     why(WHY.fullToNewcomer(u, n))
-    receive(work, push, why, n, [u], rows, M.full)
+    receive(work, push, why, n, [u], rows, M.full, { n })
   }
 
   const queue = [u]
@@ -230,7 +253,7 @@ export function runMove(state: DsdvState, input: unknown): Result {
   while (queue.length) {
     const v = queue.shift()!
     sent += 1
-    const changed = advertise(work, push, why, v, M.advertise)
+    const changed = advertise(work, push, why, v, M.advertise, { v })
     for (const n of changed) if (!queue.includes(n)) queue.push(n)
   }
   push(`No table changed in the last round, so the update stops after ${plural(sent, 'advertisement')}.`, M.loop)

@@ -72,9 +72,9 @@ export function runBuildLinks(state: EvaluationState): Result {
   work.links = []
   work.marked = []
   work.cds = []
-  const { steps, push, why } = recorder(work)
-  const rng = mulberry32(work.seed)
   const range = short(work.range)
+  const { steps, push, why } = recorder(work, { radio_range: range })
+  const rng = mulberry32(work.seed)
   const inner = short(Q * work.range)
   const ns = work.nodes
   for (let i = 0; i < ns.length; i++)
@@ -83,22 +83,23 @@ export function runBuildLinks(state: EvaluationState): Result {
       const d = dist(ns[i], ns[j])
       const { linked, band } = decide(work.graph, d, work.range, rng)
       const pair = { nodes: { [p]: 'current' as HighlightKind, [q]: 'current' as HighlightKind } }
+      const at = { p, q, d: f2(d) }
       if (linked) {
         work.links.push(makeLink(p, q))
         const key = `${p < q ? p : q}-${p < q ? q : p}`
         const hl = { ...pair, links: { [key]: 'new' as HighlightKind } }
         if (band === 'between') {
-          push(`${p} and ${q} are ${f2(d)} apart, between ${inner} and ${range}, and the draw says yes: link ${p}-${q}.`, B.linked, hl)
+          push(`${p} and ${q} are ${f2(d)} apart, between ${inner} and ${range}, and the draw says yes: link ${p}-${q}.`, B.linked, hl, [], at)
           why(WHY.between())
         } else {
-          push(`${p} and ${q} are ${f2(d)} apart, within range ${range}: link ${p}-${q}.`, B.linked, hl)
+          push(`${p} and ${q} are ${f2(d)} apart, within range ${range}: link ${p}-${q}.`, B.linked, hl, [], at)
           why(WHY.linked(p, q))
         }
       } else if (band === 'between') {
-        push(`${p} and ${q} are ${f2(d)} apart, between ${inner} and ${range}, and the draw says no: no link.`, B.notLinked, pair)
+        push(`${p} and ${q} are ${f2(d)} apart, between ${inner} and ${range}, and the draw says no: no link.`, B.notLinked, pair, [], at)
         why(WHY.between())
       } else {
-        push(`${p} and ${q} are ${f2(d)} apart, beyond range ${range}, so they cannot hear each other.`, B.notLinked, pair)
+        push(`${p} and ${q} are ${f2(d)} apart, beyond range ${range}, so they cannot hear each other.`, B.notLinked, pair, [], at)
         why(WHY.apart())
       }
     }
@@ -141,11 +142,11 @@ export function runCds(state: EvaluationState): Result {
     if (pair) {
       work.marked.push(v)
       marks[v] = 'found'
-      push(`${pair[0]} and ${pair[1]} are neighbors of ${v} but not of each other, so ${v} is marked.`, C.marked, { nodes: { ...marks } })
+      push(`${pair[0]} and ${pair[1]} are neighbors of ${v} but not of each other, so ${v} is marked.`, C.marked, { nodes: { ...marks } }, [], { v })
       why(WHY.marked(v))
     } else {
       marks[v] = 'visited'
-      push(`Every two neighbors of ${v} are neighbors of each other, so ${v} is not marked.`, C.notMarked, { nodes: { ...marks } })
+      push(`Every two neighbors of ${v} are neighbors of each other, so ${v} is not marked.`, C.notMarked, { nodes: { ...marks } }, [], { v })
       why(WHY.notMarked(v))
     }
   }
@@ -154,13 +155,13 @@ export function runCds(state: EvaluationState): Result {
     const u = largerCover(work, v, work.marked)
     if (u === null) {
       marks[v] = 'found'
-      push(`No marked neighbor with a larger id covers all of ${v}'s neighbors, so ${v} stays.`, C.kept, { nodes: { ...marks, [v]: 'current' } })
+      push(`No marked neighbor with a larger id covers all of ${v}'s neighbors, so ${v} stays.`, C.kept, { nodes: { ...marks, [v]: 'current' } }, [], { v, u: 'None' })
       why(WHY.kept(v))
       continue
     }
     kept.delete(v)
     marks[v] = 'dropped'
-    push(`${u} has a larger id and covers ${v} and all its neighbors, so ${v} is unmarked.`, C.pruned, { nodes: { ...marks } })
+    push(`${u} has a larger id and covers ${v} and all its neighbors, so ${v} is unmarked.`, C.pruned, { nodes: { ...marks } }, [], { v, u })
     why(WHY.pruned(v, u))
   }
   work.cds = work.marked.filter((v) => kept.has(v))
@@ -201,9 +202,10 @@ export function seedRun(graph: Graph, s: number) {
 export function runMetrics(state: EvaluationState, input: unknown): Result {
   const work = cloneNet(state)
   delete work.metrics
-  const { steps, push, why } = recorder(work)
   const k = Number(input)
-  if (!Number.isInteger(k) || k < 1 || k > 10) {
+  const valid = Number.isInteger(k) && k >= 1 && k <= 10
+  const { steps, push, why } = recorder(work, { seed: valid ? `range(1, ${k + 1})` : 'None' })
+  if (!valid) {
     push('Type a number of seeds from 1 to 10.', ML.def)
     why(WHY.seeds())
     return { steps, finalSnapshot: cloneNet(work) }
@@ -215,6 +217,8 @@ export function runMetrics(state: EvaluationState, input: unknown): Result {
       const r = seedRun(g, s)
       runs.push(r)
       push(`${GRAPH_LABEL[g]}, seed ${s}: ${fmtPdr(r.pdr)} % delivered.`, ML.flow, undefined, [], {
+        seed: s,
+        design: GRAPH_LABEL[g],
         pdr: fmtPdr(r.pdr),
         delay: fmtDelay(r.delay),
         overhead: fmtOverhead(r.overhead),
