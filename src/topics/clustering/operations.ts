@@ -1,6 +1,6 @@
 // SPEC.md §10.6: LCA cluster election by ID rule, with nodes leaving and joining.
 import { cloneNet, linkKey, listIds, makeLink, neighbors, parseIds, plural, recorder, removeNode } from '@/lib/net'
-import { connectedUnitDisk } from '@/lib/sim/placement'
+import { connectedUnitDisk, freeSpot } from '@/lib/sim/placement'
 import { mulberry32, randInt } from '@/lib/sim/rng'
 import type { HighlightKind, NetHighlight, NetNode } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
@@ -228,7 +228,9 @@ export function runJoin(state: ClusterState, input: unknown): Result {
   const unique = [...new Set(nbrs)]
   const cx = unique.reduce((t, x) => t + byId.get(x)!.x, 0) / unique.length
   const cy = unique.reduce((t, x) => t + byId.get(x)!.y, 0) / unique.length
-  work.nodes.push({ id: u, x: Math.round((cx + 0.3) * 10) / 10, y: Math.round((cy + 0.3) * 10) / 10, roles: [] })
+  // A gap of 1 leaves room for the two head rings around a neighbor.
+  const spot = freeSpot(work.nodes, { x: cx + 0.3, y: cy + 0.3 }, { x: cx, y: cy }, { gap: 1 })
+  work.nodes.push({ id: u, ...spot, roles: [] })
   for (const x of unique) work.links.push(makeLink(u, x))
   work.head[u] = null
   push(`${u} joins the network with links to ${listIds(unique)}.`, J.add, view(work, { [u]: 'new' }))

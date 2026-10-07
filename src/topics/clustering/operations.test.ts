@@ -77,14 +77,14 @@ describe('node leaves', () => {
 describe('node joins', () => {
   const elected = runElect(seedNetwork('highest')).finalSnapshot
 
-  it('7 linked to 6 and 8 joins head 8 and lands at the centroid plus (0.3, 0.3)', () => {
+  it('7 linked to 6 and 8 joins head 8 and lands above the centroid, clear of 8', () => {
     const { steps, finalSnapshot } = runJoin(elected, '7 6 8')
     expect(descs(steps)).toEqual([
       '7 joins the network with links to 6, 8.',
       '7 joins cluster head 8, which it can hear.',
       'Gateways are now 6.',
     ])
-    expect(finalSnapshot.nodes.at(-1)).toMatchObject({ id: '7', x: 2.8, y: 1.3 })
+    expect(finalSnapshot.nodes.at(-1)).toMatchObject({ id: '7', x: 2.5, y: 2.2 })
     expect(finalSnapshot.head['7']).toBe('8')
   })
 

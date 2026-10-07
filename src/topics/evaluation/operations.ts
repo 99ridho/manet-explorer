@@ -2,7 +2,7 @@
 import { cloneNet, listIds, makeLink, neighbors, plural, recorder } from '@/lib/net'
 import { dist, unitDiskLinked } from '@/lib/sim/geometry'
 import { fmtDelay, fmtOverhead, fmtPdr, mean, ML, std, summarize, type Summary } from '@/lib/sim/metrics'
-import { uniform } from '@/lib/sim/placement'
+import { spread, uniform } from '@/lib/sim/placement'
 import { mulberry32, randInt, type Rng } from '@/lib/sim/rng'
 import { runFlow, type Flow } from '@/lib/sim/run'
 import type { HighlightKind, NetLink, NetNode } from '@/types/net'
@@ -61,7 +61,7 @@ export function seedNetwork(graph: Graph = 'udg', seed = 1): EvaluationSnapshot 
 export function randomNetwork(graph: Graph, seed: number): EvaluationSnapshot {
   const rng = mulberry32(seed)
   const ids = 'ABCDEFGHIJ'.slice(0, randInt(rng, 8, 10)).split('')
-  const nodes = uniform(rng, ids, 6, 4)
+  const nodes = spread(rng, ids, 6, 4)
   return { nodes, links: linksFor(graph, nodes, RANGE, seed), range: RANGE, packets: [], graph, seed, marked: [], cds: [] }
 }
 

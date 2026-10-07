@@ -2,6 +2,7 @@
 // through the day as teams (RPGM) or alone (RWP); the metrics run compares the two.
 import { cloneNet, linkKey, listIds, makeLink, neighbors, plural, recorder } from '@/lib/net'
 import { dist } from '@/lib/sim/geometry'
+import { freeSpot } from '@/lib/sim/placement'
 import { pushMetricsSteps } from '@/lib/sim/metrics'
 import { initMotion, moveAll, recordLinks, tickRng, unitDiskLinks, type Group, type MobilityParams } from '@/lib/sim/mobility'
 import { mulberry32 } from '@/lib/sim/rng'
@@ -201,8 +202,7 @@ export function runJoin(state: CampState, input: unknown): Result {
     return { steps, finalSnapshot: cloneNet(work) }
   }
   const anchor = byId(work, near)
-  const p = { x: anchor.x + 0.5, y: anchor.y - 0.5 }
-  while (work.nodes.some((n) => dist(n, p) < 0.4)) p.x = Math.round((p.x + 0.6) * 10) / 10
+  const p = freeSpot(work.nodes, { x: anchor.x + 0.5, y: anchor.y - 0.5 }, anchor)
   work.nodes.push({ id: u, x: p.x, y: p.y, roles: [] })
   for (const n of work.nodes) if (n.id !== u && !n.down && dist(n, p) <= work.range + 1e-9) work.links.push(makeLink(u, n.id))
   work.address = { ...work.address, [u]: null }

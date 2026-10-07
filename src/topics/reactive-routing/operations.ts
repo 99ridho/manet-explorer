@@ -1,7 +1,7 @@
 // SPEC.md §10.3: route discovery, data forwarding, and link breaks for AODV and DSR.
 import { cloneNet, explainer, findLink, frame, linkKey, listIds, makeLink, neighbors, plural } from '@/lib/net'
 import { dist, unitDiskLinked } from '@/lib/sim/geometry'
-import { isConnected, uniform } from '@/lib/sim/placement'
+import { isConnected, spread } from '@/lib/sim/placement'
 import { mulberry32, randInt } from '@/lib/sim/rng'
 import type { HighlightKind, InFlight, NetHighlight } from '@/types/net'
 import type { OperationDefinition, OperationResult, Step } from '@/types/step-engine'
@@ -40,7 +40,7 @@ export function randomNetwork(protocol: Protocol, seed: number): ReactiveSnapsho
   const temp = Array.from({ length: count }, (_, i) => `n${i}`)
   const range = 1.5
   for (let tries = 0; tries < 20; tries++) {
-    const placed = uniform(rng, temp, 4.5, 3)
+    const placed = spread(rng, temp, 4.5, 3)
     const links = []
     for (let i = 0; i < placed.length; i++)
       for (let j = i + 1; j < placed.length; j++)

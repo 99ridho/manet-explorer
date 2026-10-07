@@ -1,7 +1,7 @@
 // SPEC.md §10.1: Build links, Find bridges, and Link ETX. Each run() emits the §10.1 step table.
 import { cloneNet, explainer, findLink, frame, linkKey, makeLink, neighbors, plural } from '@/lib/net'
 import { dist, SHADOWING_SIGMA, shadowingMargin, unitDiskLinked } from '@/lib/sim/geometry'
-import { isConnected, uniform } from '@/lib/sim/placement'
+import { isConnected, spread } from '@/lib/sim/placement'
 import { mulberry32, normal, randInt } from '@/lib/sim/rng'
 import type { HighlightKind, NetLink } from '@/types/net'
 import type { OperationDefinition, OperationResult, Step } from '@/types/step-engine'
@@ -72,7 +72,7 @@ export function randomNetwork(model: LinkModel, seed: number): MultihopSnapshot 
   const ids = 'ABCDEFGH'.slice(0, count).split('')
   let attempt: MultihopSnapshot = seedNetwork(model)
   for (let tries = 0; tries < 20; tries++) {
-    attempt = { ...seedNetwork(model), nodes: uniform(rng, ids, 6, 4), seed: seed + tries }
+    attempt = { ...seedNetwork(model), nodes: spread(rng, ids, 6, 4), seed: seed + tries }
     attempt.links = decidePairs(attempt)
       .filter((p) => p.linked)
       .map((p) => makeLink(p.p, p.q))

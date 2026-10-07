@@ -891,7 +891,7 @@ Steps: "Type a node id, such as 9." or "There is no node `{u}`." (line 1); "`{u}
 8      net.recompute_gateways()
 ```
 
-Steps: "Type a new id and its neighbors, such as 7 6 8.", "Node `{u}` already exists.", or "There is no node `{x}` to link to." (line 1); "`{u}` joins the network with links to `{list}`." (line 2); "`{u}` joins cluster head `{h}`, which it can hear." (line 5) or "`{u}` hears no cluster head, so it becomes one." (line 7, adding one to `elections`); the gateway row of Leave at line 8. The new node is placed at the centroid of its neighbors plus (0.3, 0.3); on the elected seed, 7 linked to 6 and 8 lands at (2.8, 1.3) and joins head 8.
+Steps: "Type a new id and its neighbors, such as 7 6 8.", "Node `{u}` already exists.", or "There is no node `{x}` to link to." (line 1); "`{u}` joins the network with links to `{list}`." (line 2); "`{u}` joins cluster head `{h}`, which it can hear." (line 5) or "`{u}` hears no cluster head, so it becomes one." (line 7, adding one to `elections`); the gateway row of Leave at line 8. The new node is placed at the centroid of its neighbors plus (0.3, 0.3) when that spot is at least 1 from every node, and otherwise at the first such spot on rings around the centroid (ADR-016); on the elected seed, 7 linked to 6 and 8 lands at (2.5, 2.2) and joins head 8.
 
 **Live fields:** `nodes`, `heads`, `gateways`, `elections`.
 

@@ -107,3 +107,10 @@ Students new to networking get a story per topic, a reason on every step, a glos
 
 Every topic and case study simulator now has a story and a why on every step, so `story` is required on `TopicModule`. The Scenario tab took the place of Real-World Usage at the course owner's request, because a worked story covers what that tab was for. `content` keeps `coreMaterial` only, and `extract-content.mjs` no longer copies §2 of the references, which stay unchanged. A scenario that needs a §2 fact quotes it with its page. Who's who lists only the active variant's seed nodes, because the Week 8 variants and the case studies cast nodes the other variants lack. Randomize marks the story roles as not applying only when the nodes really changed, because Week 8's Randomize restores its scene.
 
+
+## ADR-016: Placed nodes keep a minimum gap
+
+- Date: 2026-10-07
+- Status: Accepted
+
+Nodes that Randomize or a join placed could land on top of each other, because random positions had no minimum distance and joins only stepped 0.4 units to the right. `spread()` in `src/lib/sim/placement.ts` now keeps random nodes 0.8 units apart (`MIN_GAP`), which leaves room for a node beside an MPR or head ring, and `connectedUnitDisk` uses it. Joins go through `freeSpot()`: the old spot when it is clear, else the first clear spot on rings around the anchor. Clustering asks for 1 unit so a new node clears a head's two rings, and address allocation asks for 1 unit between strips that include the two caption lines under each node. This moved one pinned result in §10.6: 7 linked to 6 and 8 now lands at (2.5, 2.2) instead of (2.8, 1.3), which sat 0.36 from 8. Randomize draws different networks for the same seed. The evaluation metrics run keeps `uniform()`, so its pinned numbers do not change. `src/lib/sim/placement.test.ts` checks the gap for every topic's Randomize and for chained joins.

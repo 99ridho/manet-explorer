@@ -1,6 +1,7 @@
 // SPEC.md §10.7: Buddy pool splitting and query-based DAD, with a crash leak and a partition merge.
 import { cloneNet, linkKey, listIds, makeLink, neighbors, parseIds, plural, recorder, removeNode } from '@/lib/net'
 import { dist } from '@/lib/sim/geometry'
+import { freeSpot } from '@/lib/sim/placement'
 import { mulberry32, randInt, type Rng } from '@/lib/sim/rng'
 import type { NodeCaption } from '@/components/visualizer/canvas/NetworkCanvas'
 import type { HighlightKind, NetNode } from '@/types/net'
@@ -109,12 +110,10 @@ export function addressLabels(s: AddressSnapshot): Record<string, NodeCaption> {
   return out
 }
 
-/** Next to `via`, nudged right until no node sits within 0.4. */
+/** Next to `via`, clear of every node and its two caption lines (0.8 units under it, 1 unit wide). */
 function placeNear(s: AddressSnapshot, via: NetNode): { x: number; y: number } {
   const others = [...s.nodes, ...(s.merged ? [] : s.partition.nodes)]
-  const p = { x: via.x + 0.5, y: via.y - 0.8 }
-  while (others.some((n) => dist(n, p) < 0.4)) p.x = Math.round((p.x + 0.6) * 10) / 10
-  return p
+  return freeSpot(others, { x: via.x + 0.5, y: via.y - 0.8 }, via, { below: 0.8, gap: 1 })
 }
 
 /** Parses "D C" into a new id and an existing configured node; null on anything else. */
