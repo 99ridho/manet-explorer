@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { linkKey, neighbors } from '@/lib/net'
 import type { NetNode, NetSnapshot } from '@/types/net'
+import { MIN_GAP } from '@/lib/sim/placement'
 import { LINK_STROKE, LINK_WIDTH, NODE_FILL, NODE_TEXT } from './kinds'
+import { separate } from './separate'
 
 const UNIT = 60
 const R = 15
@@ -58,7 +60,8 @@ export function NetworkCanvas({ snapshot, nodeLabels, trails, extent }: NetworkC
     )
   }
 
-  const byId = new Map(nodes.map((n) => [n.id, px(n)]))
+  // Moving nodes can meet in the model; they are drawn MIN_GAP apart without changing the model.
+  const byId = separate(new Map(nodes.map((n) => [n.id, px(n)])), MIN_GAP * UNIT)
   const pts = [...byId.values()]
   // A fixed area already leaves room at its edges, so it needs only room for a node.
   const pad = extent ? R * 1.5 : Math.max(R * 2.5, (snapshot.range * UNIT) / 2)
@@ -92,11 +95,14 @@ export function NetworkCanvas({ snapshot, nodeLabels, trails, extent }: NetworkC
       )}
 
       {trails &&
-        Object.entries(trails).map(([id, trail]) =>
-          trail.length > 1 ? (
+        Object.entries(trails).map(([id, trail]) => {
+          const node = nodes.find((n) => n.id === id)
+          const drawn = byId.get(id)
+          const off = node && drawn ? { x: drawn.x - px(node).x, y: drawn.y - px(node).y } : { x: 0, y: 0 }
+          return trail.length > 1 ? (
             <polyline
               key={`trail-${id}`}
-              points={trail.map((t) => `${px(t).x},${px(t).y}`).join(' ')}
+              points={trail.map((t) => `${px(t).x + off.x},${px(t).y + off.y}`).join(' ')}
               fill="none"
               stroke="var(--color-muted-foreground)"
               strokeOpacity={0.45}
@@ -104,8 +110,8 @@ export function NetworkCanvas({ snapshot, nodeLabels, trails, extent }: NetworkC
               strokeDasharray="1 4"
               strokeLinecap="round"
             />
-          ) : null,
-        )}
+          ) : null
+        })}
 
       {pathPts.length > 1 && (
         <polyline
