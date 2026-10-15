@@ -25,6 +25,8 @@ export interface MeshSnapshot extends NetSnapshot {
   transmissions: number[] // per delivered packet, every try on every hop
   tries: number // every try of every packet, delivered or not
   control: number // RREQ, RREP, and report messages
+  joinAt?: { x: number; y: number } // where M appears; the seed's spot when absent
+  random?: boolean // set by Randomize, so the metrics run rebuilds the random mesh from `seed`
   metrics?: MetricsResult
 }
 

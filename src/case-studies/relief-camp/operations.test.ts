@@ -1,6 +1,7 @@
 // Executable form of the SPEC.md §19.2 step tables and seed results.
 import { describe, expect, it } from 'vitest'
-import { runAdvance, runElect, runJoin, seedNetwork } from './operations'
+import { isConnected } from '@/lib/sim/placement'
+import { campTrajectory, randomNetwork, runAdvance, runElect, runJoin, seedNetwork } from './operations'
 
 describe('seed', () => {
   it('pins the Buddy pools of the joins in arrival order', () => {
@@ -77,5 +78,29 @@ describe('advance the day', () => {
 
   it('rejects a tick count outside 1 to 30', () => {
     expect(runAdvance(seedNetwork(), 31).steps[0]).toMatchObject({ highlightLine: 1, description: 'Type a number of ticks from 1 to 30.' })
+  })
+})
+
+const seeds = Array.from({ length: 20 }, (_, i) => i + 1)
+
+describe('randomize', () => {
+  it('keeps the three teams, connects the camp, and gives every volunteer an address and a head', () => {
+    for (const seed of seeds) {
+      const s = randomNetwork('rpgm', seed)
+      expect(s.random).toBe(true)
+      expect(s.nodes.map((n) => n.id)).toEqual(seedNetwork().nodes.map((n) => n.id))
+      expect(isConnected(s.nodes, s.links)).toBe(true)
+      for (const n of s.nodes) {
+        expect(s.address[n.id], `seed ${seed} ${n.id}`).not.toBeNull()
+        expect(s.head[n.id], `seed ${seed} ${n.id}`).toBeTruthy()
+      }
+    }
+  })
+
+  it('places the same camp under either model, so the metrics run compares them on it', () => {
+    for (const seed of seeds) {
+      expect(randomNetwork('rwp', seed).nodes).toEqual(randomNetwork('rpgm', seed).nodes)
+      expect(campTrajectory('rwp', seed, 1, true)[0].nodes).toEqual(randomNetwork('rpgm', seed).nodes)
+    }
   })
 })

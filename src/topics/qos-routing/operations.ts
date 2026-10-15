@@ -1,5 +1,7 @@
 // SPEC.md §10.10: one Find path per metric (hop count, bandwidth, ETX, energy) and Send packets.
+import { reaches } from '@/lib/graph'
 import { cloneNet, findLink, linkKey, listIds, makeLink, neighbors, plural, pyList, recorder } from '@/lib/net'
+import { namedNetwork, uncluttered } from '@/lib/sim/placement'
 import { mulberry32, randInt } from '@/lib/sim/rng'
 import type { HighlightKind, NetLink } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
@@ -35,16 +37,34 @@ export function seedNetwork(metric: Metric = 'bandwidth'): QosSnapshot {
   return { nodes, links, range: 1.5, packets: [], metric, path: null, sent: 0, firstDown: null }
 }
 
-/** The same topology with new link values and batteries. */
+/**
+ * 5 to 7 connected nodes with room for every link label (no crossings, at most three links a node),
+ * A and E the farthest pair; A and E are not neighbors and no single relay cuts them apart.
+ */
 export function randomNetwork(metric: Metric, seed: number): QosSnapshot {
   const rng = mulberry32(seed)
-  const s = seedNetwork(metric)
-  for (const l of s.links) {
-    const w = randInt(rng, 4, 10) / 10
-    Object.assign(l, { bandwidth: randInt(rng, 1, 6), quality: w, qualityBack: w })
+  const others = 'BCDFG'.split('').slice(0, randInt(rng, 3, 5))
+  for (let tries = 0; tries < 1000; tries++) {
+    const placed = namedNetwork(rng, ['A', 'E'], others, 4.5, 3, 1.5, 1.1)
+    if (!placed || !uncluttered(placed.nodes, placed.links) || !twoWays(placed, 'A', 'E')) continue
+    const s: QosSnapshot = { ...seedNetwork(metric), ...placed }
+    for (const n of s.nodes) {
+      n.roles = n.id === 'A' ? ['source'] : n.id === 'E' ? ['dest'] : []
+      n.battery = randInt(rng, 2, 10) * 10
+    }
+    for (const l of s.links) {
+      const w = randInt(rng, 4, 10) / 10
+      Object.assign(l, { bandwidth: randInt(rng, 1, 6), quality: w, qualityBack: w })
+    }
+    return s
   }
-  for (const n of s.nodes) n.battery = randInt(rng, 2, 10) * 10
-  return s
+  return seedNetwork(metric)
+}
+
+/** No direct link, and every relay can fail with src still reaching dst: the metrics have two paths to compare. */
+function twoWays(s: Pick<QosSnapshot, 'nodes' | 'links'>, src: string, dst: string): boolean {
+  if (findLink(s, src, dst)) return false
+  return s.nodes.every((r) => r.id === src || r.id === dst || reaches({ nodes: s.nodes.map((n) => (n.id === r.id ? { ...n, down: true } : n)), links: s.links }, src, dst))
 }
 
 export const etxOf = (l: NetLink) => 1 / ((l.quality ?? 1) * (l.qualityBack ?? l.quality ?? 1))

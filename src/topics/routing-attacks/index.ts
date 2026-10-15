@@ -1,7 +1,8 @@
+import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { AttacksCanvas } from './canvas'
 import { coreMaterial } from './content'
-import { attacksOperations, seedNetwork } from './operations'
+import { attacksOperations, randomNetwork, seedNetwork } from './operations'
 import { attacksPseudocode } from './pseudocode'
 import { story } from './story'
 import { attacksStructure } from './structure'
@@ -29,7 +30,6 @@ export const routingAttacks: TopicModule<AttackState, AttackSnapshot> = {
     default: 'blackhole',
   },
   createInitialState: (variant) => seedNetwork(asAttacker(variant)),
-  // SPEC §10.11: no random scene; the button restores the variant's seed.
-  randomize: (_state, variant) => seedNetwork(asAttacker(variant)),
+  randomize: (_state, variant) => randomNetwork(asAttacker(variant), newSeed()),
   story,
 }

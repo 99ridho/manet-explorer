@@ -4,6 +4,9 @@ import type { NetNode } from '@/types/net'
 import { dist } from './geometry'
 import { connectedUnitDisk, freeSpot, MIN_GAP, spread } from './placement'
 import { mulberry32 } from './rng'
+import * as communityMesh from '@/case-studies/community-mesh/operations'
+import * as reliefCamp from '@/case-studies/relief-camp/operations'
+import * as sarSlope from '@/case-studies/sar-slope/operations'
 import * as addressAllocation from '@/topics/address-allocation/operations'
 import * as broadcast from '@/topics/broadcast/operations'
 import * as clustering from '@/topics/clustering/operations'
@@ -11,7 +14,9 @@ import * as evaluation from '@/topics/evaluation/operations'
 import * as geographicRouting from '@/topics/geographic-routing/operations'
 import * as multihop from '@/topics/multihop/operations'
 import * as proactiveRouting from '@/topics/proactive-routing/operations'
+import * as qosRouting from '@/topics/qos-routing/operations'
 import * as reactiveRouting from '@/topics/reactive-routing/operations'
+import * as routingAttacks from '@/topics/routing-attacks/operations'
 
 const seeds = Array.from({ length: 20 }, (_, i) => i + 1)
 
@@ -53,6 +58,12 @@ describe('randomize in every topic that draws positions', () => {
     ['multihop', (s) => multihop.randomNetwork('disk', s)],
     ['proactive-routing', (s) => proactiveRouting.randomNetwork('incremental', s)],
     ['reactive-routing', (s) => reactiveRouting.randomNetwork('aodv', s)],
+    ['qos-routing', (s) => qosRouting.randomNetwork('hop', s)],
+    ['routing-attacks black hole', (s) => routingAttacks.randomNetwork('blackhole', s)],
+    ['routing-attacks wormhole', (s) => routingAttacks.randomNetwork('wormhole', s)],
+    ['sar-slope', (s) => sarSlope.randomNetwork('mpr', s)],
+    ['relief-camp', (s) => reliefCamp.randomNetwork('rpgm', s)],
+    ['community-mesh', (s) => communityMesh.randomNetwork('hop', s)],
   ]
   for (const [name, build] of builders)
     it(`${name} keeps every pair MIN_GAP apart`, () => {

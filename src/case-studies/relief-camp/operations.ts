@@ -2,12 +2,12 @@
 // through the day as teams (RPGM) or alone (RWP); the metrics run compares the two.
 import { cloneNet, linkKey, listIds, makeLink, neighbors, plural, pyList, recorder } from '@/lib/net'
 import { dist } from '@/lib/sim/geometry'
-import { freeSpot } from '@/lib/sim/placement'
+import { freeSpot, isConnected, MIN_GAP, spread } from '@/lib/sim/placement'
 import { pushMetricsSteps } from '@/lib/sim/metrics'
 import { initMotion, moveAll, recordLinks, tickRng, unitDiskLinks, type Group, type MobilityParams } from '@/lib/sim/mobility'
 import { mulberry32 } from '@/lib/sim/rng'
 import { runFlow, type Topology } from '@/lib/sim/run'
-import type { HighlightKind, NetHighlight } from '@/types/net'
+import type { HighlightKind, NetHighlight, NetNode } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { CampSnapshot, CampState, Focus, Mobility, Range } from './types'
@@ -144,7 +144,39 @@ export function seedNetwork(mobility: Mobility = 'rpgm', seed = SEED): CampSnaps
     ['5', 8.4, 3.6],
     ['1', 9.5, 2.4],
   ]
-  const nodes = at.map(([id, x, y]) => ({ id, x, y, roles: [] }))
+  return camp(mobility, seed, at.map(([id, x, y]) => ({ id, x, y, roles: [] })))
+}
+
+/**
+ * The three teams on new ground, drawn from `seed`: team centres at least 3.5 apart and 2 units clear
+ * of the far edges for the RPGM loop, each team's first member at its centre and the others 0.8 from
+ * it, and the camp connected under the unit disk rule. The positions do not depend on `mobility`, so
+ * the metrics run rebuilds the same camp under either model.
+ */
+export function randomNetwork(mobility: Mobility, seed: number): CampSnapshot {
+  const rng = mulberry32(seed)
+  const { w, h } = PARAMS.area
+  for (let tries = 0; tries < 100; tries++) {
+    const centres = spread(rng, TEAMS.map((t) => t[0]), w - 5, h - 5, 3.5).map((c) => ({ x: c.x + 1.5, y: c.y + 1.5 }))
+    if (centres.some((c, i) => centres.slice(i + 1).some((d) => dist(c, d) < 3.5))) continue
+    const nodes: NetNode[] = []
+    TEAMS.forEach((members, i) => {
+      for (const id of members) {
+        let p = { ...centres[i] }
+        for (let t = 0; t < 30 && nodes.some((n) => dist(n, p) < MIN_GAP); t++) {
+          const a = rng() * 2 * Math.PI
+          p = { x: Math.round((centres[i].x + 0.8 * Math.cos(a)) * 10) / 10, y: Math.round((centres[i].y + 0.8 * Math.sin(a)) * 10) / 10 }
+        }
+        nodes.push({ id, ...p, roles: [] })
+      }
+    })
+    if (nodes.every((n, i) => nodes.slice(i + 1).every((m) => dist(n, m) >= MIN_GAP)) && isConnected(nodes, unitDiskLinks(nodes, RANGE)))
+      return { ...camp(mobility, seed, nodes), random: true }
+  }
+  return seedNetwork(mobility, seed)
+}
+
+function camp(mobility: Mobility, seed: number, nodes: NetNode[]): CampSnapshot {
   const groups: Group[] | undefined =
     mobility === 'rpgm'
       ? TEAMS.map((members) => {
@@ -184,17 +216,20 @@ export function seedNetwork(mobility: Mobility = 'rpgm', seed = SEED): CampSnaps
     pairsConnected: 0,
     pairsTotal: 0,
   }
-  // Buddy joins in the SPEC's order, each through its nearest configured neighbor.
-  for (const id of JOIN_ORDER) {
-    if (id === JOIN_ORDER[0]) {
-      s.pool[id] = [[1, SPACE]]
-      s.address[id] = 1
-      continue
-    }
-    const near = neighbors(s, id)
+  // Buddy joins in the SPEC's order, each through its nearest configured neighbor. A volunteer with no
+  // configured neighbor yet waits for the next in line; on the seed nobody waits.
+  s.pool[JOIN_ORDER[0]] = [[1, SPACE]]
+  s.address[JOIN_ORDER[0]] = 1
+  const waiting = JOIN_ORDER.slice(1)
+  const nearOf = (id: string) =>
+    neighbors(s, id)
       .filter((n) => s.address[n] != null && largest(s.pool[n]) > 1)
       .sort((a, b) => dist(byId(s, id), byId(s, a)) - dist(byId(s, id), byId(s, b)))
-    if (near.length) split(s, near[0], id)
+  for (;;) {
+    const i = waiting.findIndex((id) => nearOf(id).length)
+    if (i < 0) break
+    const [id] = waiting.splice(i, 1)
+    split(s, nearOf(id)[0], id)
   }
   elect(s)
   computeGateways(s)
@@ -409,8 +444,8 @@ export const METRICS_FLOWS = [
 ]
 
 /** The topology at every tick of a fresh camp on `seed` under `mobility`. */
-export function campTrajectory(mobility: Mobility, seed: number, ticks: number): Topology[] {
-  const s = seedNetwork(mobility, seed)
+export function campTrajectory(mobility: Mobility, seed: number, ticks: number, random = false): Topology[] {
+  const s = random ? randomNetwork(mobility, seed) : seedNetwork(mobility, seed)
   const topo: Topology[] = []
   for (let t = 0; t < ticks; t++) {
     topo.push({ nodes: s.nodes.map((n) => ({ ...n })), links: s.links.map((l) => ({ ...l })) })
@@ -426,7 +461,7 @@ export function runMetrics(state: CampState): Result {
   const { steps, push, why } = recorder(work, { seed: work.seed })
   const order: Mobility[] = work.mobility === 'rpgm' ? ['rpgm', 'rwp'] : ['rwp', 'rpgm']
   const designs = order.map((m) => {
-    const topo = campTrajectory(m, work.seed, METRICS_TICKS)
+    const topo = campTrajectory(m, work.seed, METRICS_TICKS, work.random)
     return {
       label: RUN_LABEL[m],
       runs: METRICS_FLOWS.map((f) => runFlow({ ...f, packets: METRICS_TICKS }, { ticks: METRICS_TICKS, topologyAt: (t) => topo[t] })),

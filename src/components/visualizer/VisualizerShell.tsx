@@ -60,7 +60,7 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
   const handleRandomize = () => {
     const next = topic.randomize(state, variant)
     setState(next)
-    // A topic whose Randomize restores its scene (Week 8) keeps the story's cast.
+    // Story roles apply only while the nodes stand where the seed puts them.
     setRandomized(nodesOf(next) !== nodesOf(topic.createInitialState(variant)))
     setSteps(NO_STEPS)
     setInputError(null)

@@ -1,5 +1,6 @@
 // Seeded node placement for randomize() (SPEC.md §7.2, §10).
 import type { NetLink, NetNode } from '@/types/net'
+import { makeLink } from '../net'
 import { dist, unitDiskLinked } from './geometry'
 import type { Rng } from './rng'
 
@@ -87,9 +88,10 @@ export function connectedUnitDisk(
   h: number,
   range: number,
   tries = 20,
+  gap = MIN_GAP,
 ): { nodes: NetNode[]; links: NetLink[] } | null {
   for (let t = 0; t < tries; t++) {
-    const nodes = spread(rng, ids, w, h)
+    const nodes = spread(rng, ids, w, h, gap)
     const links: NetLink[] = []
     for (let i = 0; i < nodes.length; i++)
       for (let j = i + 1; j < nodes.length; j++)
@@ -115,4 +117,40 @@ export function farthestPair(nodes: NetNode[]): [NetNode, NetNode] {
       }
     }
   return best
+}
+
+/**
+ * A connected unit disk network with its farthest pair named `ends` and the other nodes `others`, in
+ * that order; null after `tries` misses. A wider `gap` leaves room for a label on every link.
+ */
+export function namedNetwork(
+  rng: Rng,
+  ends: [string, string],
+  others: string[],
+  w: number,
+  h: number,
+  range: number,
+  gap = MIN_GAP,
+): { nodes: NetNode[]; links: NetLink[] } | null {
+  const placed = connectedUnitDisk(rng, [ends[0], ...others, ends[1]].map((_, i) => `n${i}`), w, h, range, 20, gap)
+  if (!placed) return null
+  const [p, q] = farthestPair(placed.nodes)
+  const rest = placed.nodes.filter((n) => n !== p && n !== q)
+  const rename = new Map([[p.id, ends[0]], [q.id, ends[1]], ...rest.map((n, i): [string, string] => [n.id, others[i]])])
+  const nodes = [p, ...rest, q].map((n) => ({ ...n, id: rename.get(n.id)! }))
+  return { nodes, links: placed.links.map((l) => makeLink(rename.get(l.a)!, rename.get(l.b)!)) }
+}
+
+/** Whether no two links that share no node cross and no node has more than `degree` links, so every link's label has room. */
+export function uncluttered(nodes: NetNode[], links: NetLink[], degree = 3): boolean {
+  if (nodes.some((n) => links.filter((l) => l.a === n.id || l.b === n.id).length > degree)) return false
+  const at = new Map(nodes.map((n) => [n.id, n]))
+  const side = (p: NetNode, q: NetNode, r: NetNode) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x))
+  return links.every((l, i) =>
+    links.slice(i + 1).every((m) => {
+      if (new Set([l.a, l.b, m.a, m.b]).size < 4) return true
+      const [p, q, r, s] = [l.a, l.b, m.a, m.b].map((id) => at.get(id)!)
+      return side(p, q, r) * side(p, q, s) >= 0 || side(r, s, p) * side(r, s, q) >= 0
+    }),
+  )
 }

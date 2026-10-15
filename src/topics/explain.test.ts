@@ -1,11 +1,16 @@
 // SPEC.md §20: every step of every topic and case study simulator says why, in at most two plain
 // sentences, and each story casts only seed nodes.
 import { describe, expect, it } from 'vitest'
+import * as communityMesh from '@/case-studies/community-mesh/operations'
 import { caseStudies } from '@/case-studies/registry'
+import * as reliefCamp from '@/case-studies/relief-camp/operations'
+import * as sarSlope from '@/case-studies/sar-slope/operations'
 import { intro } from '@/start/intro'
 import type { NetSnapshot } from '@/types/net'
 import type { Step, TopicModule } from '@/types/step-engine'
+import * as qosRouting from './qos-routing/operations'
 import { topics } from './registry'
+import * as routingAttacks from './routing-attacks/operations'
 import { INPUTS } from './test-inputs'
 
 const MAX_WHY = 240
@@ -66,6 +71,15 @@ const CHAINS: Record<string, Chain[]> = {
   ],
 }
 
+// Randomize keeps each scene's labels, so the seed inputs and chains also run on random networks.
+const RANDOM: Record<string, (variant: never, seed: number) => unknown> = {
+  'qos-routing': qosRouting.randomNetwork,
+  'routing-attacks': routingAttacks.randomNetwork,
+  'sar-slope': sarSlope.randomNetwork,
+  'relief-camp': reliefCamp.randomNetwork,
+  'community-mesh': communityMesh.randomNetwork,
+}
+
 function expectWhy(steps: Step<unknown>[], where: string) {
   expect(steps.length, `${where}: steps`).toBeGreaterThan(0)
   steps.forEach((s, i) => {
@@ -92,6 +106,16 @@ describe.each(modules.map((t) => [t.slug, t] as const))('%s explains every step'
       expect(inputs, `${slug}/${op.id} has test inputs`).toBeDefined()
       for (const input of inputs!) expectWhy(op.run(topic.createInitialState(variant), input).steps, `${slug} ${op.id} ${String(input)}`)
     }
+  })
+
+  const random = RANDOM[slug]
+  it.runIf(random).each(variants.map((v) => [v ?? 'default', v] as const))('on random networks, variant %s', (_name, variant) => {
+    for (let seed = 1; seed <= 5; seed++)
+      for (const op of topic.operations) {
+        if (op.variants && (!variant || !op.variants.includes(variant))) continue
+        const inputs = INPUTS[`${slug}/${op.id}`] ?? [undefined]
+        for (const input of inputs) expectWhy(op.run(random(variant as never, seed), input).steps, `${slug} seed ${seed} ${op.id} ${String(input)}`)
+      }
   })
 
   it('after earlier operations', () => {

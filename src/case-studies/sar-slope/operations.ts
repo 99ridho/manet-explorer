@@ -2,12 +2,14 @@
 // a radio that walks away, and the metrics run.
 import { bridgesAndCuts, reaches } from '@/lib/graph'
 import { cloneNet, linkKey, listIds, makeLink, neighbors, parseIds, plural, recorder } from '@/lib/net'
-import { dist, unitDiskLinked } from '@/lib/sim/geometry'
+import { dist } from '@/lib/sim/geometry'
+import { unitDiskLinks } from '@/lib/sim/mobility'
+import { MIN_GAP, namedNetwork } from '@/lib/sim/placement'
 import { pushMetricsSteps } from '@/lib/sim/metrics'
 import { mulberry32 } from '@/lib/sim/rng'
 import { runFlow, type RelayRule } from '@/lib/sim/run'
 import { selectMpr } from '@/topics/broadcast/operations'
-import type { HighlightKind, NetSnapshot } from '@/types/net'
+import type { HighlightKind, NetNode, NetSnapshot } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { Focus, Relay, SarSnapshot, SarState } from './types'
@@ -82,24 +84,39 @@ export function seedNetwork(relay: Relay = 'mpr'): SarSnapshot {
   return settle(s)
 }
 
-/** The team moves to new spots within 1.5 of R1; its links follow the unit disk rule. */
+/**
+ * Relays R1 to R5 and G on a new slope: a connected unit disk network with R1 and G the farthest pair,
+ * R1 on the left, R2 to R5 numbered left to right, and one radio alone linking G. The team stands
+ * within 1.5 of R1, on the side away from G; every link follows the unit disk rule.
+ */
 export function randomNetwork(relay: Relay, seed: number): SarSnapshot {
   const rng = mulberry32(seed)
   const s = seedNetwork(relay)
-  const r1 = s.nodes.find((n) => n.id === 'R1')!
-  for (const t of s.nodes.filter((n) => TEAM.includes(n.id))) {
-    const a = rng() * 2 * Math.PI
-    const d = 0.6 + rng() * 0.9
-    t.x = Math.round((r1.x + d * Math.cos(a)) * 10) / 10
-    t.y = Math.round((r1.y + d * Math.sin(a)) * 10) / 10
-  }
-  s.links = s.links.filter((l) => !TEAM.includes(l.a) && !TEAM.includes(l.b))
-  for (const t of TEAM)
-    for (const n of s.nodes) {
-      const p = s.nodes.find((x) => x.id === t)!
-      if (n.id !== t && !(TEAM.includes(n.id) && n.id < t) && unitDiskLinked(dist(p, n), s.range)) s.links.push(makeLink(t, n.id))
+  for (let tries = 0; tries < 100; tries++) {
+    const placed = namedNetwork(rng, ['R1', GATEWAY], ['R2', 'R3', 'R4', 'R5'], 5, 2.5, s.range)
+    if (!placed) continue
+    const [r1, g] = [placed.nodes[0], placed.nodes[5]]
+    // Mirror so R1 sits on the left and G on the right, as on the seed.
+    const flip = r1.x > g.x
+    const at = (n: NetNode) => ({ x: Math.round(((flip ? 5 - n.x : n.x) + 2) * 10) / 10, y: Math.round((n.y + 2) * 10) / 10 })
+    const mid = placed.nodes.slice(1, 5).sort((a, b) => at(a).x - at(b).x || at(a).y - at(b).y)
+    const rename = new Map([[r1.id, 'R1'], [g.id, GATEWAY], ...mid.map((n, i): [string, string] => [n.id, `R${i + 2}`])])
+    const nodes = [r1, ...mid, g].map((n) => ({ id: rename.get(n.id)!, ...at(n), roles: n === g ? ['dest' as const] : [] }))
+    const team: NetNode[] = []
+    const base = nodes[0]
+    for (let t = 0; t < 60 && team.length < TEAM.length; t++) {
+      const a = Math.PI / 2 + rng() * Math.PI
+      const d = 0.8 + rng() * 0.7
+      const p = { x: Math.round((base.x + d * Math.cos(a)) * 10) / 10, y: Math.round((base.y + d * Math.sin(a)) * 10) / 10 }
+      if ([...nodes, ...team].every((n) => dist(n, p) >= MIN_GAP) && dist(base, p) <= s.range) team.push({ id: TEAM[team.length], ...p, roles: [] })
     }
-  return settle(s)
+    if (team.length < TEAM.length) continue
+    const all = [...team, ...nodes]
+    const links = unitDiskLinks(all, s.range).map((l) => makeLink(l.a, l.b))
+    if (neighbors({ nodes: all, links }, GATEWAY).length !== 1) continue
+    return settle({ ...s, nodes: all, links })
+  }
+  return s
 }
 
 /** The route from `src` to G that the next-hop tables hold, or null. */

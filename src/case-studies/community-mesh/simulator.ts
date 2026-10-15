@@ -2,7 +2,7 @@ import { newSeed } from '@/lib/sim/rng'
 import type { TopicModule } from '@/types/step-engine'
 import { MeshCanvas } from './canvas'
 import { scenario } from './content'
-import { ROUTING_LABEL, meshOperations, seedNetwork } from './operations'
+import { ROUTING_LABEL, meshOperations, randomNetwork, seedNetwork } from './operations'
 import { meshPseudocode } from './pseudocode'
 import { cast } from './story'
 import { meshStructure } from './structure'
@@ -29,7 +29,6 @@ export const meshSimulator: TopicModule<MeshState, MeshSnapshot> = {
     default: 'etx-watchdog',
   },
   createInitialState: (variant) => seedNetwork(asRouting(variant)),
-  // A fresh seed redraws the retries; the mesh and its delivery ratios stay.
-  randomize: (_state, variant) => seedNetwork(asRouting(variant), newSeed()),
+  randomize: (_state, variant) => randomNetwork(asRouting(variant), newSeed()),
   story: { scenario, cast },
 }

@@ -1,7 +1,11 @@
 // SPEC.md §10.11: DSR-style discovery under a black hole or a wormhole, sending, and the watchdog.
 import { floodRreq } from '@/lib/dsr-flood'
-import { cloneNet, findLink, linkKey, listIds, makeLink, pyList, recorder } from '@/lib/net'
-import type { HighlightKind } from '@/types/net'
+import { cloneNet, findLink, linkKey, listIds, makeLink, neighbors, pyList, recorder } from '@/lib/net'
+import { dist, unitDiskLinked } from '@/lib/sim/geometry'
+import { unitDiskLinks } from '@/lib/sim/mobility'
+import { MIN_GAP, namedNetwork } from '@/lib/sim/placement'
+import { mulberry32, randInt, type Rng } from '@/lib/sim/rng'
+import type { HighlightKind, NetNode } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { AttackSnapshot, AttackState, Attacker } from './types'
@@ -63,6 +67,70 @@ export function seedNetwork(attacker: Attacker = 'blackhole'): AttackSnapshot {
   // The link M claims, drawn dashed as on the slide; it carries no radio traffic.
   if (black) links.push(makeLink('M', 'D', { virtual: true, broken: true }))
   return { nodes, links, range: 1.5, attacker, ...structuredClone(empty), linkLabels: black ? { 'D-M': 'claimed' } : undefined }
+}
+
+/** A spot 0.8 to 1.4 from `near`, `MIN_GAP` clear of every node and out of range of every node in `far`; null after 30 draws. */
+function attackerSpot(rng: Rng, nodes: NetNode[], near: NetNode, far: NetNode[], range: number): { x: number; y: number } | null {
+  for (let t = 0; t < 30; t++) {
+    const a = rng() * 2 * Math.PI
+    const d = 0.8 + rng() * 0.6
+    const p = { x: Math.round((near.x + d * Math.cos(a)) * 10) / 10, y: Math.round((near.y + d * Math.sin(a)) * 10) / 10 }
+    if (nodes.every((n) => dist(n, p) >= MIN_GAP) && far.every((n) => !unitDiskLinked(dist(n, p), range))) return p
+  }
+  return null
+}
+
+/** Hops on the shortest radio path, or Infinity. */
+function hops(s: Pick<AttackSnapshot, 'nodes' | 'links'>, from: string, to: string): number {
+  const depth = new Map([[from, 0]])
+  const queue = [from]
+  while (queue.length) {
+    const v = queue.shift()!
+    if (v === to) return depth.get(v)!
+    for (const w of neighbors(s, v))
+      if (!depth.has(w)) {
+        depth.set(w, depth.get(v)! + 1)
+        queue.push(w)
+      }
+  }
+  return Infinity
+}
+
+/**
+ * Honest nodes S, A, B, … D in a connected unit disk network, S and D the farthest pair, and the
+ * variant's attackers placed by the scene's rules: M next to S and out of D's range; M1 next to S and
+ * M2 next to D, out of range of each other and of the far end, with S at least 4 honest hops from D.
+ */
+export function randomNetwork(attacker: Attacker, seed: number): AttackSnapshot {
+  const rng = mulberry32(seed)
+  const range = 1.5
+  const worm = attacker === 'wormhole'
+  const others = 'ABCEFG'.split('').slice(0, randInt(rng, 3, worm ? 6 : 5))
+  for (let tries = 0; tries < 100; tries++) {
+    const placed = namedNetwork(rng, [SRC, DST], others, worm ? 6 : 4.5, worm ? 2.5 : 3, range)
+    if (!placed || hops(placed, SRC, DST) < (worm ? 4 : 2)) continue
+    const [src, dst] = [placed.nodes[0], placed.nodes[placed.nodes.length - 1]]
+    const bad: NetNode[] = []
+    for (const [id, near, far] of worm
+      ? ([['M1', src, [dst]], ['M2', dst, [src]]] as const)
+      : ([['M', src, [dst]]] as const)) {
+      const p = attackerSpot(rng, [...placed.nodes, ...bad], near, [...far, ...bad], range)
+      if (!p) break
+      bad.push({ id, ...p, roles: [] })
+    }
+    if (bad.length !== (worm ? 2 : 1)) continue
+    const nodes = [...placed.nodes.slice(0, -1), ...bad, dst].map((n) => ({
+      ...n,
+      roles: n.id === SRC ? ['source' as const] : n.id === DST ? ['dest' as const] : n.id.startsWith('M') && attacker !== 'none' ? ['malicious' as const] : [],
+    }))
+    const links = unitDiskLinks(nodes, range).map((l) => makeLink(l.a, l.b))
+    if (worm) links.push(makeLink('M1', 'M2', { virtual: true }))
+    // The link M claims, drawn dashed as on the slide; it carries no radio traffic.
+    else if (attacker === 'blackhole') links.push(makeLink('M', DST, { virtual: true, broken: true }))
+    const linkLabels = worm ? { 'M1-M2': 'tunnel' } : attacker === 'blackhole' ? { [linkKey('M', DST)]: 'claimed' } : undefined
+    return { nodes, links, range, attacker, ...structuredClone(empty), linkLabels }
+  }
+  return seedNetwork(attacker)
 }
 
 const isBlackHole = (s: AttackSnapshot, id: string) => s.attacker === 'blackhole' && id === 'M'

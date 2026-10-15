@@ -1,6 +1,7 @@
 // Executable form of the SPEC.md §10.11 step tables and seed results.
 import { describe, expect, it } from 'vitest'
-import { runDiscover, runSend, runWatchdog, seedNetwork } from './operations'
+import { findLink, neighbors } from '@/lib/net'
+import { randomNetwork, runDiscover, runSend, runWatchdog, seedNetwork } from './operations'
 import type { Attacker } from './types'
 
 const discovered = (a: Attacker) => runDiscover(seedNetwork(a)).finalSnapshot
@@ -128,5 +129,42 @@ describe('send with watchdog', () => {
       [5, 'Packet 1 reaches D.'],
     ])
     expect(finalSnapshot).toMatchObject({ delivered: 5, flagged: [], tunneled: 5, route: ['S', 'M1', 'M2', 'D'] })
+  })
+})
+
+const seeds = Array.from({ length: 20 }, (_, i) => i + 1)
+
+describe('randomize', () => {
+  it('black hole: M sits next to S and out of D range, answers first, and the watchdog reports it', () => {
+    for (const seed of seeds) {
+      const s = randomNetwork('blackhole', seed)
+      expect(randomNetwork('blackhole', seed)).toEqual(s)
+      expect(neighbors(s, 'M')).toContain('S')
+      expect(neighbors(s, 'M')).not.toContain('D')
+      expect(findLink(s, 'M', 'D')?.virtual).toBe(true)
+      const d = runDiscover(s).finalSnapshot
+      expect(d.route).toEqual(['S', 'M', 'D'])
+      const w = runWatchdog(d, 10).finalSnapshot
+      expect(w.flagged, `seed ${seed}`).toEqual(['M'])
+      expect(w.route).not.toContain('M')
+    }
+  })
+
+  it('wormhole: the tunnel route wins over at least 4 honest hops', () => {
+    for (const seed of seeds) {
+      const s = randomNetwork('wormhole', seed)
+      expect(neighbors(s, 'M1')).not.toContain('D')
+      expect(neighbors(s, 'M2')).not.toContain('S')
+      expect(runDiscover(s).finalSnapshot.route?.join(), `seed ${seed}`).toContain('M1,M2')
+    }
+  })
+
+  it('no attacker: M is ordinary and S finds a route', () => {
+    for (const seed of seeds) {
+      const s = randomNetwork('none', seed)
+      expect(s.nodes.find((n) => n.id === 'M')?.roles).toEqual([])
+      expect(findLink(s, 'M', 'D')).toBeUndefined()
+      expect(runDiscover(s).finalSnapshot.route).not.toBeNull()
+    }
   })
 })

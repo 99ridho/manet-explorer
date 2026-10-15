@@ -3,7 +3,9 @@
 import { floodRreq } from '@/lib/dsr-flood'
 import { cloneNet, findLink, linkKey, listIds, makeLink, pyList, recorder } from '@/lib/net'
 import { pushMetricsSteps } from '@/lib/sim/metrics'
-import { mulberry32 } from '@/lib/sim/rng'
+import { dist, unitDiskLinked } from '@/lib/sim/geometry'
+import { MIN_GAP, namedNetwork, uncluttered } from '@/lib/sim/placement'
+import { mulberry32, randInt } from '@/lib/sim/rng'
 import type { FlowRun } from '@/lib/sim/run'
 import type { HighlightKind, NetLink } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
@@ -64,6 +66,46 @@ export function seedNetwork(routing: Routing = 'etx-watchdog', seed = SEED): Mes
     tries: 0,
     control: 0,
   }
+}
+
+const quiet = { hop: 0, arrival: 0, silent: 0, broadcast: 0, duplicate: 0, dest: 0, first: 0, blackHole: 0, tunnel: 0 }
+
+/** The route each metric picks from the RREPs of a flood without steps: [hop count, ETX]. */
+function picks(s: MeshSnapshot): [string, string] {
+  const rules = { blackHole: (id: string) => isBlackHole(s, id), farEnd: () => null }
+  const { routes } = floodRreq(s, SRC, DST, rules, () => {}, () => {}, quiet)
+  const candidates = routes.map((route) => ({ route, hops: route.length - 1, etx: routeEtx(s, route) }))
+  return (['hop', 'etx-watchdog'] as const).map((routing) => pick({ ...s, routing }, candidates)?.route.join() ?? '') as [string, string]
+}
+
+/**
+ * Honest routers S, A, B, … D in a connected unit disk network with room for every link label (no
+ * crossings, at most three links a router), S and D the farthest pair, with delivery ratios from 0.4
+ * to 1.0 drawn so that hop count and ETX pick different routes. M will join next to S, in range of S alone.
+ */
+export function randomNetwork(routing: Routing, seed: number): MeshSnapshot {
+  const rng = mulberry32(seed)
+  const range = 1.5
+  const others = 'ABCEFG'.split('').slice(0, randInt(rng, 3, 5))
+  for (let tries = 0; tries < 1000; tries++) {
+    const placed = namedNetwork(rng, [SRC, DST], others, 4.5, 3, range, 1.1)
+    if (!placed || !uncluttered(placed.nodes, placed.links)) continue
+    const src = placed.nodes[0]
+    let joinAt: { x: number; y: number } | null = null
+    for (let t = 0; t < 30 && !joinAt; t++) {
+      const a = rng() * 2 * Math.PI
+      const d = 0.8 + rng() * 0.6
+      const p = { x: Math.round((src.x + d * Math.cos(a)) * 10) / 10, y: Math.round((src.y + d * Math.sin(a)) * 10) / 10 }
+      if (placed.nodes.every((n) => dist(n, p) >= MIN_GAP && (n === src) === unitDiskLinked(dist(n, p), range))) joinAt = p
+    }
+    if (!joinAt) continue
+    const s: MeshSnapshot = { ...seedNetwork(routing, seed), ...placed, range, joinAt, random: true }
+    for (const n of s.nodes) n.roles = n.id === SRC ? ['source'] : n.id === DST ? ['dest'] : []
+    for (const l of s.links) l.quality = l.qualityBack = randInt(rng, 4, 10) / 10
+    const [hop, etx] = picks(s)
+    if (hop && etx && hop !== etx) return s
+  }
+  return seedNetwork(routing, seed)
 }
 
 export const etxOf = (l: NetLink) => 1 / ((l.quality ?? 1) * (l.qualityBack ?? l.quality ?? 1))
@@ -129,7 +171,7 @@ export function runJoinM(state: MeshState): Result {
     return { steps, finalSnapshot: cloneNet(work) }
   }
   work.joined = true
-  work.nodes.push({ id: MALLORY, x: 0.8, y: 1.8, roles: [] })
+  work.nodes.push({ id: MALLORY, ...(work.joinAt ?? { x: 0.8, y: 1.8 }), roles: [] })
   work.links.push(makeLink(SRC, MALLORY, { quality: 0.95, qualityBack: 0.95 }))
   push('A new router M appears next to S.', J.add, { nodes: { [MALLORY]: 'new' }, links: { [linkKey(SRC, MALLORY)]: 'new' } })
   why(WHY.appears())
@@ -261,8 +303,8 @@ export function runDeliver(state: MeshState, input: unknown): Result {
 }
 
 /** Join M, find a route, and send `k` packets without steps: one design's metrics run. */
-export function meshRun(routing: Routing, seed: number, k: number): FlowRun {
-  let s = runJoinM(seedNetwork(routing, seed)).finalSnapshot
+export function meshRun(routing: Routing, seed: number, k: number, random = false): FlowRun {
+  let s = runJoinM(random ? randomNetwork(routing, seed) : seedNetwork(routing, seed)).finalSnapshot
   s = runFindRoute(s).finalSnapshot
   for (let p = 1; p <= k && s.route; p++) deliverOne(s, p)
   return {
@@ -281,7 +323,7 @@ export function runMetrics(state: MeshState): Result {
   work.focus = 'route'
   const { steps, push, why } = recorder(work, { seed: work.seed })
   const order: Routing[] = work.routing === 'etx-watchdog' ? ['etx-watchdog', 'hop'] : ['hop', 'etx-watchdog']
-  const designs = order.map((r) => ({ label: ROUTING_LABEL[r], runs: [meshRun(r, work.seed, 30)] }))
+  const designs = order.map((r) => ({ label: ROUTING_LABEL[r], runs: [meshRun(r, work.seed, 30, work.random)] }))
   pushMetricsSteps(push, `seed ${work.seed}, with M joined`, designs, (r) => {
     if (r) work.metrics = r
     else delete work.metrics

@@ -1175,7 +1175,7 @@ Line 8 compares closed neighborhoods (a node plus its neighbors) and checks agai
 
 Batteries: A 100, B 20, C 60, D 80, E 100 units.
 
-**Randomize:** keeps the topology and draws new link values and batteries.
+**Randomize:** 5 to 7 nodes in a 4.5 × 3 area, at least 1.1 apart and connected under the unit disk rule with `range = 1.5`. No two links cross and no node has more than three links, so every link label has room. The two most distant nodes become A (source) and E (destination), and the others take B, C, D, F, G in node order. A and E are not neighbors, and every relay can fail with A still reaching E, so each metric has more than one path to weigh. Each link draws a bandwidth from 1 to 6 Mbps and one delivery ratio from 0.4 to 1.0 for both directions; each node draws a battery from 20 to 100 units in steps of 10. The draw repeats up to 1000 times on one seed stream and falls back to the seed if none fits.
 
 **Find path** (`path-hop`, `path-bandwidth`, `path-etx`, `path-energy`, one per variant; `inputKind: "text"`; placeholders "Source and destination, e.g. A E" and, for bandwidth, "Source, destination, Mbps, e.g. A E 3")
 
@@ -1278,7 +1278,7 @@ Discovery is DSR-style (Section 10.3), because Week 8 says the watchdog suits so
 
 **Seeds.** Black hole and no attacker (Week 8, "Black hole menarik rute lalu membuang paket"; Misra Figure 18.2): nodes S (0,1), A (1,0), M (1,2), B (2,0), D (3,1); links S-A, S-M, A-B, B-D; under Black hole, M is `malicious` and the claimed link M-D is drawn `virtual` and dashed, as on the slide; under No attacker, M is an ordinary node with no link to D. Wormhole (Week 8, "Wormhole membuat dua area terasa bertetangga"; Misra Figure 18.3): nodes S (0,1), A (1,0), M1 (1,2), B (2,0), C (3,0), M2 (3,2), D (4,1); links S-A, A-B, B-C, C-D, S-M1, M2-D; M1 and M2 `malicious`; the tunnel M1-M2 is `virtual`.
 
-**Randomize:** none; the button restores the variant's seed, and its label reads Reset scene.
+**Randomize:** keeps the variant's cast and draws new positions. The honest nodes, S, D, and 3 to 5 others named A, B, C, E, F (up to 6 under Wormhole, adding G), are connected under the unit disk rule with `range = 1.5`, and S and D are the two most distant: in a 4.5 × 3 area under Black hole and No attacker, 6 × 2.5 under Wormhole. M stands 0.8 to 1.4 from S and out of D's range, and its links follow the unit disk rule; Black hole adds the claimed link M-D. Under Wormhole, M1 stands 0.8 to 1.4 from S and M2 0.8 to 1.4 from D, M1 out of D's range, M2 out of the range of S and M1, and the honest route from S to D takes at least 4 hops, so the 3-hop route through the tunnel arrives first. The draw repeats up to 100 times on one seed stream and falls back to the seed if none fits.
 
 **Discover route** (`discover`, `inputKind: "none"`, from S to D)
 
@@ -1496,7 +1496,7 @@ This section is mandatory and not open for negotiation. It is dsa-course Section
 **Hard rules:**
 
 - No em dash character (U+2014) anywhere, and no spaced double hyphen used as a dash (R-02). Use a period, comma, colon, or parentheses. The en dash is allowed only inside a numeric range such as `Weeks 1–3`.
-- No generic CTAs (R-15). Buttons name their action: Go, Randomize, Reset, Reset scene, Step forward, Check, Next, Retry.
+- No generic CTAs (R-15). Buttons name their action: Go, Randomize, Reset, Step forward, Check, Next, Retry.
 - No marketing vocabulary (R-16) and none of the empty AI vocabulary the copywriting skill lists.
 - No fabricated numbers, claims, or sources (R-17, R-36, R-38). **A number shown to a student is either computed by the app on the step shown, quoted from a reference with its book and page, or a named demo value** (a seed, a threshold, a range, an example link value) that the page labels as this demo's choice. Nothing else.
 - Student-facing text never points at internal documents. A student does not have `SPEC.md`.
@@ -1535,7 +1535,7 @@ Differences from dsa-course:
 
 **Snapshot:** `NetSnapshot` plus `focus: "topology" | "broadcast" | "route"`, `mpr` (Section 10.4), `reverse` and `route` (Section 10.3, AODV), `tx`, `dupes`, `bridges`, `cuts`.
 
-**Seed:** nodes in this order T1 (0,4), T2 (1,4.6), T3 (1,3.4), R1 (2,4), R2 (3,3.4), R3 (3,4.6), R4 (4,4), R5 (5,3), G (6,2); links T1-T2, T1-T3, T2-T3, T2-R1, T3-R1, R1-R2, R1-R3, R2-R3, R2-R4, R3-R4, R4-R5, R5-G; `range = 1.5`; T1 to T3 have role `source` when they send, G is `dest`. The resting state has `focus: "topology"`. Randomize moves the team (T1 to T3) to new positions within 1.5 of R1 and relinks them by the unit disk rule.
+**Seed:** nodes in this order T1 (0,4), T2 (1,4.6), T3 (1,3.4), R1 (2,4), R2 (3,3.4), R3 (3,4.6), R4 (4,4), R5 (5,3), G (6,2); links T1-T2, T1-T3, T2-T3, T2-R1, T3-R1, R1-R2, R1-R3, R2-R3, R2-R4, R3-R4, R4-R5, R5-G; `range = 1.5`; T1 to T3 have role `source` when they send, G is `dest`. The resting state has `focus: "topology"`. Randomize draws a new slope: R1 to R5 and G are connected under the unit disk rule in a 5 × 2.5 band, R1 and G are the two most distant, R1 sits on the left, R2 to R5 are numbered left to right, and G has exactly one neighbor, as on the seed, so that neighbor is an articulation point. T1 to T3 stand 0.8 to 1.5 from R1 on the side away from G, and every link follows the unit disk rule. The draw repeats up to 100 times on one seed stream and falls back to the seed if none fits.
 
 **Canvas.** The view switch offers Topology (the network with bridges dashed and articulation points ringed, from the Section 10.1 algorithm run once on every state), Broadcast (the network with each radio's transmissions and duplicates counted on it), and Route (the current route drawn as `tree`). Every view uses `NetworkCanvas` at the same height.
 
@@ -1617,9 +1617,9 @@ On the seed, R2 walking away leaves a path through R3; R5 walking away cuts G of
 
 **Variant:** `mobility: "rpgm" | "rwp"` (default `"rpgm"`), labeled Teams move together (RPGM) and Everyone moves alone (RWP). Week 5 names RPGM for teams that move as groups (Misra pp. 244-245). The naive design tests the camp with independent random waypoint movement.
 
-**Snapshot:** `NetSnapshot` plus `focus: "clusters" | "addresses" | "movement"`, the Section 10.7 Buddy fields over a space of 256 addresses, the Section 10.6 cluster fields, and the Section 10.8 mobility fields with three groups.
+**Snapshot:** `NetSnapshot` plus `focus: "clusters" | "addresses" | "movement"`, the Section 10.7 Buddy fields over a space of 256 addresses, the Section 10.6 cluster fields, the Section 10.8 mobility fields with three groups, and `random`, set by Randomize.
 
-**Seed:** nodes in this order 9 (3,3), 4 (2.4,3.5), 2 (3.5,2.4), 8 (6,5), 6 (5.4,4.4), 3 (6.6,5.5), 7 (9,3), 5 (8.4,3.6), 1 (9.5,2.4); teams {9, 4, 2}, {8, 6, 3}, {7, 5, 1}; `range = 3`; area 12 × 8; `seed = 9`. Links follow the unit disk rule. Addresses are the result of Buddy joins in the order 9, 4, 2, 6, 8, 3, 5, 7, 1, each through its nearest configured neighbor, starting with 9 holding 1 to 256; clusters are the result of Elect under the highest-ID rule. The test pins the resulting pools and heads. RPGM moves each team's reference point around a fixed loop of side 2 starting at its team's first node, 0.5 units per tick; members move within a disc of radius 0.8. RWP moves everyone with speed 0.3 to 0.8 and pause 0 to 2 over the whole area. The 256-address space is this demo's; the Address view draws it as a proportional bar with one segment per owner.
+**Seed:** nodes in this order 9 (3,3), 4 (2.4,3.5), 2 (3.5,2.4), 8 (6,5), 6 (5.4,4.4), 3 (6.6,5.5), 7 (9,3), 5 (8.4,3.6), 1 (9.5,2.4); teams {9, 4, 2}, {8, 6, 3}, {7, 5, 1}; `range = 3`; area 12 × 8; `seed = 9`. Links follow the unit disk rule. Addresses are the result of Buddy joins in the order 9, 4, 2, 6, 8, 3, 5, 7, 1, each through its nearest configured neighbor, starting with 9 holding 1 to 256; clusters are the result of Elect under the highest-ID rule. The test pins the resulting pools and heads. RPGM moves each team's reference point around a fixed loop of side 2 starting at its team's first node, 0.5 units per tick; members move within a disc of radius 0.8. RWP moves everyone with speed 0.3 to 0.8 and pause 0 to 2 over the whole area. The 256-address space is this demo's; the Address view draws it as a proportional bar with one segment per owner. Randomize keeps the teams and draws new ground from a fresh seed: team centres at least 3.5 apart, from 1.5 to 8.5 across and 1.5 to 4.5 up so that the RPGM loop stays in the area, each team's first member at its centre and the other two 0.8 from it, every pair at least 0.8 apart, and the camp connected. Buddy joins keep the seed's order, except that a volunteer with no configured neighbor yet waits for the next in line. The positions do not depend on the variant, and `random` tells the metrics run to rebuild this camp from `seed`. The draw repeats up to 100 times on one seed stream and falls back to the seed if none fits.
 
 **Canvas.** Clusters (heads ringed, gateways dashed, members tinted by head), Addresses (the 256-address bar and each radio's range), Movement (the network with each radio's last five positions as a trail).
 
@@ -1694,9 +1694,9 @@ The test pins `elections` after 20 ticks for both variants on the seed and requi
 
 **Variant:** `routing: "etx-watchdog" | "hop"` (default `"etx-watchdog"`), labeled ETX with watchdog and Hop count. The naive mesh picks the fewest hops and trusts every reply.
 
-**Snapshot:** `NetSnapshot` plus `focus: "links" | "route" | "trust"`, the Section 10.11 fields (`route`, `sent`, `delivered`, `dropped`, `failures`, `flagged`), `candidates` (every route an RREP brought, with its hop count and ETX), and `seed`.
+**Snapshot:** `NetSnapshot` plus `focus: "links" | "route" | "trust"`, the Section 10.11 fields (`route`, `sent`, `delivered`, `dropped`, `failures`, `flagged`), `candidates` (every route an RREP brought, with its hop count and ETX), `seed`, and two fields Randomize sets: `joinAt`, M's spot, and `random`.
 
-**Seed:** nodes S (0,1), A (1,0), B (2,0), C (3,0), X (1.5,2), D (4,1); links S-A, A-B, B-C, C-D with delivery ratio 0.95 both ways, S-X and X-D with 0.5 both ways (example values, captioned so); `seed = 3`. The joining router M enters at (0.8,1.8) with a real link S-M (0.95) and a claimed link M-D that it advertises with ratio 1.0, drawn `virtual`.
+**Seed:** nodes S (0,1), A (1,0), B (2,0), C (3,0), X (1.5,2), D (4,1); links S-A, A-B, B-C, C-D with delivery ratio 0.95 both ways, S-X and X-D with 0.5 both ways (example values, captioned so); `seed = 3`. The joining router M enters at (0.8,1.8) with a real link S-M (0.95) and a claimed link M-D that it advertises with ratio 1.0, drawn `virtual`. Randomize draws a new mesh from a fresh seed: S, D, and 3 to 5 routers named A, B, C, E, F, G, at least 1.1 apart and connected under the unit disk rule with `range = 1.5` in a 4.5 × 3 area, with no crossing links and no router on more than three links, S and D the two most distant, and one delivery ratio from 0.4 to 1.0 per link for both directions, until hop count and ETX pick different routes. M enters at `joinAt`, 0.8 to 1.4 from S and in range of S alone. `random` tells the metrics run to rebuild this mesh from `seed`. The draw repeats up to 1000 times on one seed stream and falls back to the seed if none fits.
 
 **Canvas.** Links (every link labeled with its delivery ratio and ETX), Route (the chosen route and the candidates), Trust (each node's watchdog failure count, flagged nodes filled with the destructive color and a cross badge).
 
@@ -1784,6 +1784,6 @@ The course assumes a student who has met networking before. The beginner layer i
 
 **Case studies.** A case study keeps its own Scenario tab (Section 19); its simulator's `story` reuses that scenario and adds the `cast` for the Who's who line, and every simulator step has a `why`. The steps of the shared metrics run (`pushMetricsSteps`) and the shared DSR flood (`floodRreq`) take a `why` setter and explain themselves.
 
-**Who's who** lists the cast members that are nodes of the active variant's seed, so it never changes while stepping. After Randomize it says the story roles do not apply, unless Randomize restored the seed's nodes (Section 10.11).
+**Who's who** lists the cast members that are nodes of the active variant's seed, so it never changes while stepping. After Randomize it says the story roles do not apply.
 
 **Coverage.** `src/topics/explain.test.ts` runs every topic, every case study simulator, and the Start here walkthrough, on every variant's seed and on chains of operations that reach the branches a fresh seed cannot. `e2e/beginner-layer.spec.ts` opens every topic and case study at 400px.

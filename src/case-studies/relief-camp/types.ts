@@ -24,6 +24,8 @@ export interface CampSnapshot extends NetSnapshot, LinkStats {
   motion: Record<string, Motion>
   groups?: Group[]
   history: Point[]
+  // Set by Randomize, so the metrics run rebuilds the random camp from `seed` instead of the seed camp.
+  random?: boolean
   metrics?: MetricsResult
 }
 

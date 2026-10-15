@@ -1,6 +1,8 @@
 // Executable form of the SPEC.md §19.3 step tables and seed results.
 import { describe, expect, it } from 'vitest'
-import { runDeliver, runFindRoute, runJoinM, seedNetwork } from './operations'
+import { neighbors } from '@/lib/net'
+import { isConnected, uncluttered } from '@/lib/sim/placement'
+import { randomNetwork, runDeliver, runFindRoute, runJoinM, seedNetwork } from './operations'
 import type { Routing } from './types'
 
 const found = (r: Routing, joined: boolean) => runFindRoute(joined ? runJoinM(seedNetwork(r)).finalSnapshot : seedNetwork(r))
@@ -73,5 +75,30 @@ describe('deliver 20 packets', () => {
   it('needs a route and a count from 1 to 30', () => {
     expect(runDeliver(seedNetwork(), 5).steps[0].description).toBe('There is no route yet. Run Find route first.')
     expect(runDeliver(found('hop', false).finalSnapshot, 31).steps[0]).toMatchObject({ highlightLine: 1, description: 'Type a number of packets from 1 to 30.' })
+  })
+})
+
+const seeds = Array.from({ length: 20 }, (_, i) => i + 1)
+
+describe('randomize', () => {
+  it('draws a connected mesh where hop count and ETX pick different routes', () => {
+    for (const seed of seeds) {
+      const s = randomNetwork('hop', seed)
+      expect(randomNetwork('hop', seed)).toEqual(s)
+      expect(isConnected(s.nodes, s.links)).toBe(true)
+      expect(uncluttered(s.nodes, s.links), `seed ${seed}`).toBe(true)
+      const hop = runFindRoute(s).finalSnapshot.route
+      const etx = runFindRoute({ ...s, routing: 'etx-watchdog' }).finalSnapshot.route
+      expect(hop, `seed ${seed}`).not.toEqual(etx)
+    }
+  })
+
+  it('M joins in range of S alone, and the watchdog reports it', () => {
+    for (const seed of seeds) {
+      const joined = runJoinM(randomNetwork('etx-watchdog', seed)).finalSnapshot
+      expect(neighbors(joined, 'M')).toEqual(['S'])
+      const found = runFindRoute(joined).finalSnapshot
+      expect(runDeliver(found, 20).finalSnapshot.flagged, `seed ${seed}`).toEqual(['M'])
+    }
   })
 })

@@ -1,6 +1,8 @@
 // Executable form of the SPEC.md §19.1 step tables and seed results.
 import { describe, expect, it } from 'vitest'
-import { currentRoute, runDiscover, runSend, runWalkAway, seedNetwork } from './operations'
+import { isConnected } from '@/lib/sim/placement'
+import { neighbors } from '@/lib/net'
+import { currentRoute, randomNetwork, runDiscover, runSend, runWalkAway, seedNetwork } from './operations'
 
 const route = ['T1', 'T2', 'R1', 'R2', 'R4', 'R5', 'G']
 const transmitters = (steps: { highlightLine: number; description: string }[]) =>
@@ -72,5 +74,28 @@ describe('radio walks away', () => {
 describe('topology', () => {
   it('finds the bridges and articulation points of the seed', () => {
     expect(seedNetwork()).toMatchObject({ bridges: ['G-R5', 'R4-R5'], cuts: ['R1', 'R4', 'R5'] })
+  })
+})
+
+const seeds = Array.from({ length: 20 }, (_, i) => i + 1)
+
+describe('randomize', () => {
+  it('keeps the cast, connects the slope, and leaves G one neighbor', () => {
+    for (const seed of seeds) {
+      const s = randomNetwork('mpr', seed)
+      expect(randomNetwork('mpr', seed)).toEqual(s)
+      expect(s.nodes.map((n) => n.id).sort()).toEqual(seedNetwork().nodes.map((n) => n.id).sort())
+      expect(isConnected(s.nodes, s.links)).toBe(true)
+      expect(neighbors(s, 'G'), `seed ${seed}`).toHaveLength(1)
+      expect(s.bridges.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('finds a route to G from every team radio', () => {
+    for (const seed of seeds)
+      for (const t of ['T1', 'T2', 'T3']) {
+        const d = runDiscover(randomNetwork('flooding', seed), t).finalSnapshot
+        expect(currentRoute(d, t)?.at(-1), `seed ${seed} ${t}`).toBe('G')
+      }
   })
 })

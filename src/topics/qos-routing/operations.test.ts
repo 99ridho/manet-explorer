@@ -1,6 +1,9 @@
 // Executable form of the SPEC.md §10.10 step tables and seed results.
 import { describe, expect, it } from 'vitest'
-import { runFindPath, runSend, seedNetwork } from './operations'
+import { reaches } from '@/lib/graph'
+import { findLink } from '@/lib/net'
+import { uncluttered } from '@/lib/sim/placement'
+import { randomNetwork, runFindPath, runSend, seedNetwork } from './operations'
 import type { Metric } from './types'
 
 const find = (metric: Metric, input: string) => runFindPath(seedNetwork(metric), input)
@@ -80,5 +83,29 @@ describe('send packets', () => {
 
   it('needs a path first', () => {
     expect(runSend(seedNetwork(), 5).steps[0]).toMatchObject({ highlightLine: 1, description: 'There is no path yet. Run Find path first.' })
+  })
+})
+
+const seeds = Array.from({ length: 20 }, (_, i) => i + 1)
+
+describe('randomize', () => {
+  it('draws 5 to 7 connected nodes with room for link labels, A to E with no direct link and no single relay that cuts them apart', () => {
+    for (const seed of seeds) {
+      const s = randomNetwork('etx', seed)
+      expect(randomNetwork('etx', seed)).toEqual(s)
+      expect(s.nodes.length).toBeGreaterThanOrEqual(5)
+      expect(s.nodes.length).toBeLessThanOrEqual(7)
+      expect(s.nodes.find((n) => n.roles.includes('source'))?.id).toBe('A')
+      expect(s.nodes.find((n) => n.roles.includes('dest'))?.id).toBe('E')
+      expect(findLink(s, 'A', 'E')).toBeUndefined()
+      expect(uncluttered(s.nodes, s.links), `seed ${seed}`).toBe(true)
+      for (const r of s.nodes.filter((n) => n.id !== 'A' && n.id !== 'E'))
+        expect(reaches({ nodes: s.nodes.map((n) => (n === r ? { ...n, down: true } : n)), links: s.links }, 'A', 'E'), `seed ${seed} without ${r.id}`).toBe(true)
+    }
+  })
+
+  it('finds a path from A to E by every metric', () => {
+    for (const seed of seeds)
+      for (const metric of ['hop', 'etx', 'energy'] as Metric[]) expect(runFindPath(randomNetwork(metric, seed), 'A E').finalSnapshot.path, `seed ${seed} ${metric}`).not.toBeNull()
   })
 })
