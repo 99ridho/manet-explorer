@@ -16,6 +16,7 @@ describe('select MPRs on the seed', () => {
       'C is reachable only through B, so B becomes an MPR.',
       'G is reachable only through D, so D becomes an MPR.',
     ])
+    expect(steps.filter((s) => s.highlightLine === 7).map((s) => s.description)).toEqual(['F is reachable through D, E, so it fixes no MPR.'])
     expect(steps.find((s) => s.highlightLine === 9)?.description).toBe('The MPRs so far cover C, G, F.')
     expect(steps.some((s) => s.highlightLine === 12)).toBe(false)
   })
@@ -70,6 +71,8 @@ describe('broadcast from A', () => {
     expect(steps.filter((s) => s.highlightLine === 8).map((s) => s.description.split(' ')[0])).toEqual(['A', 'B', 'D'])
     expect(finalSnapshot).toMatchObject({ tx: 3, dups: 2, reached: 6 })
     expect(descs(steps)).toContain('E is not an MPR of A, so it does not relay.')
+    expect(steps.filter((s) => s.highlightLine === 15).map((s) => s.description)).toEqual(['B is an MPR of A, so it relays.', 'D is an MPR of A, so it relays.'])
+    expect(steps.find((s) => s.description === 'C receives the packet for the first time.')?.snapshot.packets).toEqual([{ kind: 'PKT', from: 'B', to: 'C' }])
     expect(steps.at(-1)?.description).toBe('6 of 6 other nodes received the packet with 3 transmissions and 2 duplicates.')
   })
 

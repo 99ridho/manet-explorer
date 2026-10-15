@@ -28,6 +28,7 @@ export const WHY = {
   pickOnly: (dst: string) => `Only one list reached ${dst}, so that list is the route.`,
   rrepDsr: (src: string, dst: string) =>
     `${src} asked, so the answer has to get back to ${src}. ${dst} sends it along the listed radios in reverse order.`,
+  rrepDsrHop: (w: string) => `${w} finds the next name on the reversed list and hands the answer to that radio.`,
   cache: (src: string) => `With the route stored, ${src} can send data now and later without searching again.`,
   rrepHop: (prev: string, dst: string) =>
     `${prev} learns which neighbor leads to ${dst}. Each radio keeps only that one next step, not the whole route.`,
@@ -48,6 +49,8 @@ export const WHY = {
   rerrAtSource: (src: string) => `${src} noticed the break itself, so there is no radio upstream to warn.`,
   rerrUp: (src: string) =>
     `The radios between ${src} and the break still think the route works. The RERR warns them, so they stop sending into a dead end.`,
+  rerrHop: (n: string) => `The warning moves one radio at a time back toward the source, and ${n} is the next radio that used the route.`,
+  rerrPass: (n: string, src: string) => `In DSR only ${src} stores the route, so ${n} has no table entry to delete and just passes the warning on.`,
   deleteAodv: (n: string) => `A route through a broken link only loses packets, so ${n} throws it away.`,
   deleteDsr: (src: string) => `${src} stored the whole route, and that route crosses the broken link, so the stored route has to go.`,
   rerrDown: (down: string) => `${down} lost the link too, so it warns the radios on its side in the same way.`,

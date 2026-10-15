@@ -116,7 +116,7 @@ export const campQuiz: QuizQuestion[] = [
     operationId: 'elect',
     variant: 'rpgm',
     input: null,
-    stepIndex: 0,
+    stepIndex: 1,
     expect: '4 joins cluster head 9',
   },
 ]

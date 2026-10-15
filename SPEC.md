@@ -478,10 +478,11 @@ interface DsdvExtra {
 | Unknown node | 1 | "There is no node `{u}` in this network." | none |
 | Send | 2 | "`{u}` sends `{k}` rows to `{neighbors}` as a full dump." or "`{u}` sends its `{k}` changed rows to `{neighbors}`." | `{u}` current, packets |
 | Nothing changed | 2 | "`{u}` has no changed rows, so the incremental update is empty." | `{u}` current |
+| Per neighbor, receive | 3 | "`{n}` receives `{u}`'s update with `{k}` rows." (only for the broadcast; a full table sent to one newcomer already has its own row) | `{n}` current, packet `{u}` to `{n}` |
 | Per neighbor per row, new route | 7 | "`{n}` had no route to `{dest}`, so it adds one via `{u}`: `{m}` hops." | row new |
 | Per neighbor per row, newer | 7 | "`{n}` takes the route to `{dest}` via `{u}`: sequence `{seq}` is newer than `{old}`." | row new |
 | Per neighbor per row, fewer hops | 9 | "Sequence `{seq}` for `{dest}` is the same, and via `{u}` it is `{m}` hops instead of `{old}`, so `{n}` switches." | row new |
-| Per neighbor per row, keep | 11 | "`{n}` keeps its route to `{dest}` via `{next}`." | none |
+| Per neighbor per row, keep | 11 | "`{n}` keeps its route to `{dest}` via `{next}`." | `{n}` visited, `{u}` current |
 | Done | 12 | "`{u}` sent `{k}` rows to `{j}` neighbors." | none |
 
 A changed row at the receiver gets `changed = true`, so its next incremental update carries it. `updates` rises by one and `rowsSent` by `k` per advertisement.
@@ -509,10 +510,11 @@ A changed row at the receiver gets `changed = true`, so its next incremental upd
 |---|---|---|---|
 | Invalid input | 1 | "Type the node that moves and the node it moves next to, such as M3 M6." | none |
 | Move | 2 | "`{u}` moves next to `{near}`: it loses `{lost}` and gains `{gained}` as neighbors." | `{u}` current |
-| Per node, stale | 4 | "`{v}` deletes `{k}` routes that went through `{gone}`." | `{v}` current |
+| Per stale route | 4 | "`{v}` deletes its route to `{dest}`: next hop `{next}` is no longer a neighbor." | `{v}` current, `{next}` dropped |
 | New sequence | 5 | "`{u}` raises its own sequence number to `{seq}`." | `{u}` new |
 | Per new neighbor | 7 | "`{n}` is a new neighbor, so it sends `{u}` its full table of `{k}` rows." then the Advertise per-row steps for `{u}`, at line 7 | `{n}` current |
 | Per advertisement | 11 | the Advertise rows above, at line 11 | as above |
+| Per queued node | 12 | "`{n}`'s table changed, so `{n}` advertises next." | `{n}` new |
 | Done | 9 | "No table changed in the last round, so the update stops after `{k}` advertisements." | none |
 
 On the seed, `M3 M6` ends with M2's row for M3 reading next hop M4, 3 hops, sequence 194, and no other row of M2 changed: the slide's point that M2 learns of the move through M4.
@@ -596,16 +598,16 @@ DSR listing:
 | Invalid input | 1 | "Type a source and a destination, such as S D." | none |
 | New request | 2 | "`{src}` has no route to `{dst}`, so it starts route discovery `{id}`." | `{src}` current |
 | Broadcast | 7 | "`{v}` broadcasts the RREQ to `{neighbors}`." (DSR adds ", carrying the record `{record}`") | `{v}` current, packets `*` |
-| Per neighbor, duplicate | 10 | "`{n}` has already seen request `{id}`, so it drops this copy." | `{n}` dropped |
-| Per neighbor, in record (DSR) | 10 | "`{n}` is already in the record, so it drops this copy." | `{n}` dropped |
-| Per neighbor, first copy (AODV) | 12 | "`{n}` hears the RREQ first from `{v}`, so it records `{v}` as its way back to `{src}`." | link new |
-| Per neighbor, first copy (DSR) | 12 | "`{n}` adds itself: the record is now `{record}`." | link new |
+| Per neighbor, duplicate | 10 | "`{n}` has already seen request `{id}`, so it drops this copy." | `{n}` dropped, packet `{v}` to `{n}` |
+| Per neighbor, in record (DSR) | 10 | "`{n}` is already in the record, so it drops this copy." | `{n}` dropped, packet `{v}` to `{n}` |
+| Per neighbor, first copy (AODV) | 12 | "`{n}` hears the RREQ first from `{v}`, so it records `{v}` as its way back to `{src}`." | link new, packet `{v}` to `{n}` |
+| Per neighbor, first copy (DSR) | 12 | "`{n}` adds itself: the record is now `{record}`." | link new, packet `{v}` to `{n}` |
 | Arrived (AODV) | 14 | "The RREQ reaches `{dst}` through `{v}`." | `{dst}` found |
 | Candidate (DSR) | 14 | "`{dst}` receives the record `{record}`." | `{dst}` found |
 | Flood over | 5 | "The flood is over after `{k}` RREQ transmissions; `{dst}` answers instead of forwarding." | none |
 | Pick (DSR) | 17 | "`{dst}` picks `{route}`: `{h}` hops, the first to arrive." | path tree |
 | Per hop, RREP (AODV) | 20 | "The RREP goes from `{w}` to `{prev}`, so `{prev}` now forwards to `{dst}` through `{w}`." (when `{w}` is `{dst}`: "…so `{prev}` now forwards straight to `{dst}`.") | link tree, packet |
-| RREP (DSR) | 18 | "The RREP carries `{route}` back to `{src}`." | path tree, packet |
+| Per hop, RREP (DSR) | 18 | "The RREP goes from `{w}` to `{prev}`, carrying `{route}`." (the last hop: "The RREP reaches `{src}` from `{w}`, carrying `{route}`.") | path tree, packet |
 | Cached (DSR) | 19 | "`{src}` stores `{route}` in its route cache." | path tree |
 | No route | 5 | "The RREQ never reached `{dst}`: there is no route." | none |
 
@@ -668,8 +670,10 @@ DSR steps carry `variables.header`, the number of addresses in the header, which
 | No such link | 1 | "There is no link `{u}`-`{v}` to break." |
 | Break | 2 | "Link `{u}`-`{v}` breaks." |
 | Upstream end, RERR | 4 | "`{up}` sends an RERR toward `{src}`." (when `{up}` is `{src}`: "`{src}` is the source itself, so no RERR has to travel on its side.") |
-| Downstream end, RERR | 4 | "`{down}` also sends an RERR, since it sits at the other end of `{u}`-`{v}`." (after the delete rows) |
-| Per node, delete | 5 | "`{n}` deletes its route to `{dst}`, which used `{u}`-`{v}`." (DSR: "`{n}` deletes the cached route `{route}`.") |
+| Per node, delete (AODV) | 5 | "`{n}` deletes its route to `{dst}`, which used `{u}`-`{v}`." First for `{up}`, then after each RERR hop for the node it reached. |
+| Per hop, RERR | 4 | "The RERR goes from `{w}` to `{n}`." (packet), one row per hop from `{up}` back to `{src}` |
+| Delete (DSR) | 5 | "`{src}` deletes the cached route `{route}`." after the last RERR hop; DSR relays keep no table, so they only pass the RERR on. |
+| Downstream end, RERR | 4 | "`{down}` also sends an RERR, since it sits at the other end of `{u}`-`{v}`." (a local broadcast, after the upstream rows) |
 | Done | 6 | "`{src}` has no route to `{dst}` now; its next discovery uses request id `{id}`." |
 
 This is the Week 2 quiz case (link C-D breaks): C and D send the RERR, the route entries go, and S starts again with a new id. Running Discover route afterwards finds S, B, E, D. A link that no route uses breaks with the "Break" step and a final "No route used `{u}`-`{v}`, so no table changes." at line 3.
@@ -713,6 +717,7 @@ This is the Week 2 quiz case (link C-D breaks): C and D send the RERR, the route
 | No neighbors | 3 | "`{u}` has no neighbors, so it needs no MPR." | `{u}` current |
 | Sets | 3 | "`{u}` has one-hop neighbors `{N1}` and two-hop neighbors `{N2}`." (or "…and no two-hop neighbors.", then "`{u}` needs no MPR: every node it can reach is one hop away." at line 14) | N1 current, N2 visited |
 | Per unique | 8 | "`{c}` is reachable only through `{n}`, so `{n}` becomes an MPR." | `{n}` found |
+| Per two-hop node, no new MPR | 7 | "`{c}` is reachable through `{via}`, so it fixes no MPR." (when its one way in is already an MPR: "`{c}` is reachable only through `{n}`, already an MPR.") | `{c}` current, `{via}` visited |
 | Covered | 9 | "The MPRs so far cover `{covered}`." (or "No two-hop neighbor has a single way in, so no MPR is fixed yet.") | covered visited |
 | Per greedy pick | 12 | "`{n}` covers `{k}` of the uncovered two-hop neighbors, the most, so it becomes an MPR." | `{n}` found |
 | Done | 14 | "Every two-hop neighbor is covered. The MPR set of `{u}` is `{MPR}`; `{rest}` stay silent." ("stays" for one; or "; every neighbor is needed.") | MPRs found |
@@ -747,8 +752,9 @@ The MPR listing reads `15     return v in heard_from.mpr  # relay only for the n
 |---|---|---|---|
 | Invalid input | 1 | "Type a source node, such as A." | none |
 | Transmit | 8 | "`{v}` transmits the packet to `{neighbors}`." | `{v}` current, packets `*` |
-| Per neighbor, new | 12 | "`{n}` receives the packet for the first time." | `{n}` new, link new |
-| Per neighbor, duplicate | 11 | "`{n}` already has the packet, so this copy is a duplicate." | `{n}` dropped |
+| Per neighbor, new | 12 | "`{n}` receives the packet for the first time." | `{n}` new, link new, packet `{v}` to `{n}` |
+| Per neighbor, duplicate | 11 | "`{n}` already has the packet, so this copy is a duplicate." | `{n}` dropped, packet `{v}` to `{n}` |
+| Relays (MPR) | 15 | "`{v}` is an MPR of `{heardFrom}`, so it relays." (before its Transmit row) | `{v}` current |
 | Silent (MPR) | 7 | "`{v}` is not an MPR of `{heardFrom}`, so it does not relay." | received nodes visited |
 | Done | 4 | "`{r}` of `{n}` other nodes received the packet with `{t}` transmissions and `{d}` duplicates." | none |
 
@@ -806,11 +812,14 @@ The greedy rule forwards to the neighbor closest to the destination and only if 
 |---|---|---|---|
 | Invalid input | 1 | "Type a source and a destination, such as S D." | none |
 | Planarize | 2 | "The perimeter walk uses the Gabriel graph: `{k}` of `{m}` links stay." (or "every link stays.") | removed links dropped |
-| Greedy hop | 8 | "`{n}` is the neighbor closest to `{dst}`: `{dn}` against `{dv}`, so the packet moves to `{n}`." | link tree |
+| Greedy choice | 6 | "`{n}` is the neighbor of `{v}` closest to `{dst}`: `{dn}` against `{dv}`." | `{v}` current, its neighbors visited, `{n}` new |
+| Greedy hop | 8 | "The packet moves from `{v}` to `{n}`." | link tree, packet |
 | Void | 10 | "No neighbor of `{v}` is closer to `{dst}` than `{v}` itself (`{dv}`), so the packet switches to perimeter mode." | `{v}` flagged |
 | Void, greedy only | 12 | "No neighbor of `{v}` is closer to `{dst}` than `{v}` itself, so greedy forwarding drops the packet." | `{v}` dropped |
 | No progress | 14 | "The perimeter walk came back to `{stuck}` without getting closer, so `{dst}` is unreachable." | `{v}` dropped |
-| Perimeter hop | 15 | "Sweeping clockwise at `{v}`, the first link leads to `{n}`." (after a face change: "Sweeping clockwise at `{v}`, the link to `{x}` crosses the line to `{dst}`, so the walk changes face and takes the link to `{n}`.") | link tree |
+| Face change | 14 | "Sweeping clockwise at `{v}`, the link to `{x}` crosses the line to `{dst}`, so the walk skips it and changes face." One row per skipped link. | that link dropped |
+| Perimeter choice | 14 | "Sweeping clockwise at `{v}`, the first link leads to `{n}`." (after a face change: "Sweeping on at `{v}`, the next link leads to `{n}`, so the walk takes it.") | that link new |
+| Perimeter hop | 15 | "The packet moves from `{v}` to `{n}`." | link tree, packet |
 | Back to greedy | 17 | "`{v}` is `{dv}` from `{dst}`, closer than `{stuck}` was, so the packet returns to greedy mode." | `{v}` current |
 | Delivered | 18 | "The packet reaches `{dst}` after `{h}` hops." | `{dst}` found, path tree |
 
@@ -940,8 +949,8 @@ The 16-address space is this demo's choice so every address fits on screen; the 
 |---|---|---|
 | Invalid | 1 | "Type a new node id and a configured neighbor, such as D C." |
 | No spare address | 3 | "`{via}` has no range left to split, so `{new}` cannot join through it." |
-| Split | 4 | "`{via}` splits `{lo}` to `{hi}` in half." |
-| Hand over | 6 | "`{via}` keeps `{a}` to `{b}` and gives `{c}` to `{d}` to `{new}`." (a one-address range prints as the address alone) |
+| Split | 4 | "`{via}` splits `{lo}` to `{hi}` in half." (packet JOIN from `{new}` to `{via}`) |
+| Hand over | 6 | "`{via}` keeps `{a}` to `{b}` and gives `{c}` to `{d}` to `{new}`." (a one-address range prints as the address alone; packet POOL from `{via}` to `{new}`) |
 | Address | 8 | "`{new}` takes address `{addr}` without asking any other node." |
 
 On the seed, D joining through C: C keeps 13 to 14, and D takes 15.
@@ -955,7 +964,7 @@ On the seed, D joining through C: C keeps 13 to 14, and D takes 15.
 4      net.remove(u)
 ```
 
-Steps: "Type a node id, such as C." (line 1); "`{u}` has no neighbor to take its ranges, so it cannot hand them over." (line 2, and `{u}` stays); "`{u}` says goodbye and hands `{ranges}` to `{b}`." (line 3), "`{b}` now holds `{merged}`." (line 3), "`{u}` leaves." (line 4). On the seed, C leaving hands 13 to 16 to B, which then holds 9 to 16.
+Steps: "Type a node id, such as C." (line 1); "`{u}` has no neighbor to take its ranges, so it cannot hand them over." (line 2, and `{u}` stays); "`{b}` holds a range next to `{u}`'s, so `{b}` is `{u}`'s buddy." or "No neighbor holds a range next to `{u}`'s, so `{u}` picks its first neighbor, `{b}`." (line 2); "`{u}` says goodbye and hands `{ranges}` to `{b}`." (line 3), "`{b}` now holds `{merged}`." (line 3), "`{u}` leaves." (line 4). On the seed, C leaving hands 13 to 16 to B, which then holds 9 to 16.
 
 **Crash, Buddy** (`crash-buddy`, `variants: ["buddy"]`, `inputKind: "text"`, placeholder "Node, e.g. C")
 
@@ -991,8 +1000,10 @@ The slide says the AREQ repeats up to a retry limit; 3 is this demo's limit. `ra
 |---|---|---|
 | Invalid | 1 | "Type a new node id and a configured neighbor, such as D C." |
 | Pick | 2 | "`{new}` picks address `{a}` at random." |
-| Per try | 5 | "`{new}` floods AREQ `{a}` (try `{t}` of 3)." |
-| Owner | 8 | "`{owner}` already uses `{a}`, so it answers with an AREP and `{new}` picks again." |
+| Per try | 5 | "`{new}` floods AREQ `{a}` (try `{t}` of 3)." (packets to every neighbor) |
+| Per relay | 5 | "`{v}` hears AREQ `{a}` from `{w}` and rebroadcasts it." One row for every node the flood reaches, in the order it first hears the AREQ. |
+| Owner | 6 | "`{owner}` already uses `{a}`, so it answers with an AREP." |
+| Per AREP hop | 8 | "The AREP for `{a}` goes from `{w}` to `{next}`." (the last hop: "The AREP for `{a}` reaches `{new}` from `{w}`, so `{new}` picks again.") Back along the path the AREQ came. |
 | Pick again | 9 | "`{new}` picks address `{a}` at random." |
 | Silence | 12 | "Nobody answers try `{t}`." |
 | Take | 13 | "Three AREQs got no answer, so `{new}` takes address `{a}`." |
@@ -1233,7 +1244,7 @@ Energy (keep the weakest relay as strong as possible):
 | Found | 7 / 7 | "Path `{path}`: `{h}` hops, `{summary}`." (bandwidth: "every link offers at least `{need}` Mbps"; ETX: "total ETX `{c}`"; energy: "weakest relay `{b}` units"; hop: "the fewest hops") | path tree |
 | None | 12 / 14 | "No path from `{src}` to `{dst}` meets the request." | none |
 
-A neighbor that is already done (line 10) emits no step.
+A neighbor that is already done gets "`{n}` is already settled, so `{v}` skips it." at line 10 (ETX and energy). In the hop and bandwidth listings a neighbor already in `prev` is the "not better" row at line 9.
 
 Seed results from A to E: hop count picks A, D, E (2 hops); bandwidth with 3 Mbps prunes A-D and picks A, B, C, E, the slide's answer; ETX picks A, B, C, E (total 3.70 against 6.78 through D, Week 7's point that more short hops can beat fewer weak ones); energy picks A, D, E (weakest relay D at 80, against B at 20). ETX values print to two decimals.
 
@@ -1244,14 +1255,16 @@ Seed results from A to E: hop count picks A, D, E (2 hops); bandwidth with 3 Mbp
 2      for p in range(1, k + 1):
 3          if has_down_relay(path):
 4              return  # the path is broken; find a new path first
-5          send_along(path, DATA(p))
-6          for r in path[1:-1]:  # the relays, not src or dst
-7              r.battery -= 1
-8              if r.battery == 0:
-9                  r.down = True
+5          for v, nxt in zip(path, path[1:]):
+6              v.send(DATA(p), to=nxt)
+7              if v != path[0]:  # a relay, not src
+8                  v.battery -= 1
+9                  if v.battery == 0:
+10                     v.down = True
+11         net.count(p)  # p reached dst
 ```
 
-Steps: per packet at line 5 ("Packet `{p}` reaches `{dst}`; relays have `{batteries}` left."), a relay running out at line 9 ("`{r}` runs out of battery after packet `{p}`, so the path breaks."), and a stop at line 4 ("The path is broken. Find a new path first."). Sending 20 packets on the ETX path takes B down at packet 20; on the energy path D still has 60 units. Week 7 separates total energy from network lifetime (Loo p. 203); these two runs show the difference on one network.
+Steps per packet, one per hop: "`{src}` sends packet `{p}` to `{nxt}`." (line 6), then for each relay "`{v}` forwards packet `{p}` to `{nxt}`; its battery drops to `{b}`." (line 8), with "`{v}` runs out of battery after packet `{p}`, so the path breaks." (line 10) right after the hop that empties it; then "Packet `{p}` reaches `{dst}`; relays have `{batteries}` left." (line 11). A stop at line 4: "The path is broken. Find a new path first." Sending 20 packets on the ETX path takes B down at packet 20; on the energy path D still has 60 units. Week 7 separates total energy from network lifetime (Loo p. 203); these two runs show the difference on one network.
 
 **Live fields:** `hops`, `cost` (the variant's summary value), `minBatt` (the weakest relay on the path), `sent`.
 
@@ -1554,7 +1567,7 @@ MPR listing:
 
 The blind flooding listing reads `19     return True  # blind flooding: every node relays once`.
 
-Steps use the Section 10.4 Broadcast rows (transmit, first copy with "`{n}` records `{v}` as its way back to `{src}`.", duplicate, silent) at lines 10, 15, 13, and 9, focus `broadcast`; the Section 10.3 AODV RREP rows at line 17, focus `route`; and a first step at line 2 ("`{src}` needs a route to G, so it starts a route discovery.", focus `topology`). An invalid radio gives "Type a team radio: T1, T2, or T3." at line 1.
+Steps use the Section 10.4 Broadcast rows (transmit, first copy with "`{n}` records `{v}` as its way back to `{src}`.", duplicate, silent, and under MPR relaying "`{v}` is an MPR of `{heardFrom}`, so it relays.") at lines 10, 15, 13, 9, and 19, focus `broadcast`, with each received copy drawn on its link; "G receives the RREQ, so it answers instead of relaying." at line 7 when G comes off the queue; the Section 10.3 AODV RREP rows at line 17, focus `route`; and a first step at line 2 ("`{src}` needs a route to G, so it starts a route discovery.", focus `topology`). An invalid radio gives "Type a team radio: T1, T2, or T3." at line 1.
 
 Seed results from T1: blind flooding makes 8 transmissions and 15 duplicate receptions; MPR relaying makes 6 transmissions (T1, T2, R1, R2, R4, R5) and 9 duplicates; both find T1, T2, R1, R2, R4, R5, G (6 hops).
 
@@ -1625,9 +1638,9 @@ On the seed, R2 walking away leaves a path through R3; R5 walking away cuts G of
 10     cluster_join(u)  # the best head it hears, or u leads its own cluster
 ```
 
-Steps lift the Section 10.7 Buddy Join rows at line 6 (focus `addresses`) and the Section 10.6 Join rows at line 10 (focus `clusters`); "`{n}` has no spare address, so `{u}` asks the next neighbor." at line 5; "No neighbor of `{u}` has a spare address, so `{u}` cannot join yet." at line 9. On the seed, a new volunteer next to 1 cannot join through 1, whose range holds only its own address: the uneven use of the address space that Week 4 names as Buddy's weakness (Misra pp. 338-339).
+Steps lift the Section 10.7 Buddy Join rows at line 6 (focus `addresses`), after "`{n}` has a spare address, so `{u}` asks `{n}` to join through it." at line 6 (packet JOIN), and the Section 10.6 Join rows at line 10 (focus `clusters`), followed by one step per node that gains or loses the gateway role: "`{n}` now hears cluster heads `{heads}`, so it becomes a gateway." or "`{n}` no longer hears two cluster heads, so it stops being a gateway."; "`{n}` has no spare address, so `{u}` asks the next neighbor." at line 5; "No neighbor of `{u}` has a spare address, so `{u}` cannot join yet." at line 9. On the seed, a new volunteer next to 1 cannot join through 1, whose range holds only its own address: the uneven use of the address space that Week 4 names as Buddy's weakness (Misra pp. 338-339).
 
-**Elect cluster heads** (`elect`, `inputKind: "none"`): the Section 10.6 Elect listing and table over the current links, after clearing every head. Focus `clusters`.
+**Elect cluster heads** (`elect`, `inputKind: "none"`): the Section 10.6 Elect listing and table over the current links, after clearing every head, which is its own first step at line 2: "Every volunteer forgets its cluster head, so the election starts from scratch." Focus `clusters`.
 
 **Advance the day** (`advance`, `inputKind: "key"`, placeholder "Ticks, from 1 to 30")
 
@@ -1651,7 +1664,9 @@ Steps lift the Section 10.7 Buddy Join rows at line 6 (focus `addresses`) and th
 | Trigger | Line | Description | Focus |
 |---|---|---|---|
 | Per tick, calm | 4 | "Tick `{t}`: `{m}` links, and every member still hears its head." | movement |
-| Per tick, changes | 5 | "Tick `{t}`: `{k}` volunteers lost their head; `{j}` joined another head and `{e}` became heads." | clusters |
+| Per tick, changes | 4 | "Tick `{t}`: `{m}` links, and `{k}` volunteers lost their head." | movement |
+| Per member that lost its head, rejoins | 10 | "`{v}` no longer hears `{old}`, so it joins cluster head `{h}`." | clusters |
+| Per member that lost its head, new head | 12 | "`{v}` no longer hears `{old}` and hears no other head, so it becomes a head." | clusters |
 | Done | 14 | "After `{t}` ticks the camp elected `{e}` new heads." | clusters |
 
 The test pins `elections` after 20 ticks for both variants on the seed and requires the RPGM count to be lower. If a change to `src/lib/sim/mobility.ts` breaks that, the seed may change (and this section with it); the model may not be tuned to force the result.
@@ -1728,10 +1743,12 @@ The per-try success probability is `w(v, nxt) * w(nxt, v)`, drawn from `rng(seed
 
 | Trigger | Line | Description | Focus |
 |---|---|---|---|
-| Per packet, delivered | 13 | "Packet `{p}` reaches D after `{tries}` transmissions." | route |
+| Per try | 8 | "`{v}` sends packet `{p}` to `{nxt}`: ACK on try `{t}`." or "`{v}` sends packet `{p}` to `{nxt}`: no ACK on try `{t}` of 4." (packet on the link) | links |
 | Per packet, link failed | 9 | "`{v}` tried 4 times to reach `{nxt}` and got no ACK, so packet `{p}` is lost." | links |
 | Per packet, black hole | 6 | "M drops packet `{p}` without a trace." | route |
-| Watchdog rows | 12 | the Section 10.11 watchdog rows | trust |
+| Watchdog, heard | 12 | "`{v}` hears `{nxt}` forward packet `{p}`." after each hop to an honest relay, under ETX with watchdog | trust |
+| Watchdog, silence | 12 | the Section 10.11 Silence, Report, and Reroute rows, right after M drops the packet | trust |
+| Per packet, delivered | 13 | "Packet `{p}` reaches D after `{tries}` transmissions." | route |
 | Done | 14 | "`{d}` of `{k}` packets reached D: `{pdr}` %." | route |
 
 Seed results with M joined and 20 packets: the hop mesh delivers none, because every packet goes to M; the ETX mesh with watchdog loses packets 1 to 4 to M, reports M, switches to S, A, B, C, D, and delivers the rest (the test pins the exact count, which depends on the retry draws). Without M, the test also pins both designs' delivery on the seed, where the weak two-hop route loses packets to failed retries.

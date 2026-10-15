@@ -49,7 +49,7 @@ describe('join, Buddy', () => {
 describe('leave and crash, Buddy', () => {
   it('C hands 13 to 16 to B, whose range touches it, and B merges them', () => {
     const { steps, finalSnapshot } = runLeaveBuddy(seedNetwork(), 'C')
-    expect(descs(steps)).toEqual(['C says goodbye and hands 13 to 16 to B.', 'B now holds 9 to 16.', 'C leaves.'])
+    expect(descs(steps)).toEqual(["B holds a range next to C's, so B is C's buddy.", 'C says goodbye and hands 13 to 16 to B.', 'B now holds 9 to 16.', 'C leaves.'])
     expect(finalSnapshot.pool.B).toEqual([[9, 16]])
     expect(finalSnapshot.nodes.map((n) => n.id)).toEqual(['A', 'B'])
   })
@@ -101,17 +101,24 @@ describe('join, QDAD', () => {
 
   it('ends after three silent AREQs with an address no other node uses', () => {
     const lines = steps.map((s) => s.highlightLine)
-    expect(lines.slice(-7)).toEqual([5, 12, 5, 12, 5, 12, 13])
+    // Each try is four AREQ transmissions on A, B, C, D: D, then C, B, A as the flood reaches them.
+    expect(lines.slice(-16)).toEqual([5, 5, 5, 5, 12, 5, 5, 5, 5, 12, 5, 5, 5, 5, 12, 13])
+    expect(descs(steps.slice(-16, -12))).toEqual([
+      expect.stringMatching(/^D floods AREQ \d+ \(try 1 of 3\)\.$/),
+      expect.stringMatching(/^C hears AREQ \d+ from D and rebroadcasts it\.$/),
+      expect.stringMatching(/^B hears AREQ \d+ from C and rebroadcasts it\.$/),
+      expect.stringMatching(/^A hears AREQ \d+ from B and rebroadcasts it\.$/),
+    ])
     expect(steps.at(-1)?.description).toMatch(/^Three AREQs got no answer, so D takes address \d+\.$/)
     const d = finalSnapshot.address.D
     expect(['A', 'B', 'C'].map((n) => finalSnapshot.address[n])).not.toContain(d)
   })
 
-  it('counts every AREQ once per node that transmits it and every AREP once per hop', () => {
+  it('steps every AREQ transmission and every AREP hop, and counts each once', () => {
     const areqs = steps.filter((s) => s.highlightLine === 5).length
     const areps = steps.filter((s) => s.highlightLine === 8).length
-    expect(areqs).toBeGreaterThanOrEqual(3)
-    expect(finalSnapshot.control).toBeGreaterThanOrEqual(areqs * 4 + areps)
+    expect(areqs).toBeGreaterThanOrEqual(12)
+    expect(finalSnapshot.control).toBe(areqs + areps)
   })
 
   it('is the same run for the same seed and a new run for the next join', () => {

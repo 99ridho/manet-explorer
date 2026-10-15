@@ -46,7 +46,7 @@ export const broadcastPseudocode: Record<string, string[]> = {
 
 /** Line numbers the operations highlight, per listing. */
 export const L = {
-  select: { def: 1, sets: 3, unique: 8, covered: 9, pick: 12, done: 14 },
-  broadcast: { def: 1, loop: 4, silent: 7, transmit: 8, dup: 11, first: 12 },
+  select: { def: 1, sets: 3, check: 7, unique: 8, covered: 9, pick: 12, done: 14 },
+  broadcast: { def: 1, loop: 4, silent: 7, transmit: 8, dup: 11, first: 12, relays: 15 },
   remove: { def: 1, remove: 2, loop: 3, recompute: 4 },
 } as const

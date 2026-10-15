@@ -16,6 +16,8 @@ export const WHY = {
   sent: (u: string) => `Every neighbor of ${u} has now compared ${u}'s rows with its own table.`,
   moveInput: () => 'A move needs the node that walks away and the node it ends up next to.',
   moved: (u: string) => `${u}'s radio only reaches nearby nodes, so moving changes who its neighbors are.`,
+  receive: (n: string, u: string) => `${n} is in range of ${u}, so it hears the update and checks every row against its own table.`,
+  queued: (n: string) => `A changed table has news for the neighbors, so ${n} sends its own update in turn.`,
   stale: (v: string) => `A route whose next hop is out of range would lose every packet, so ${v} drops it right away.`,
   seq: (u: string) =>
     `The higher number marks this as fresh news about ${u}, so every node that hears it will replace its older route to ${u}.`,

@@ -31,6 +31,7 @@ describe('volunteer joins', () => {
       [2, '10 arrives next to 1 and hears 1, 7, 5.'],
       [5, '1 has no spare address, so 10 asks the next neighbor.'],
       [5, '7 has no spare address, so 10 asks the next neighbor.'],
+      [6, '5 has a spare address, so 10 asks 5 to join through it.'],
       [6, '5 splits 125 to 126 in half.'],
       [6, '5 keeps 125 and gives 126 to 10.'],
       [6, '10 takes address 126 without asking any other node.'],
@@ -49,8 +50,9 @@ describe('volunteer joins', () => {
 describe('elect', () => {
   it('re-elects 9, 8, and 7 with gateways 6 and 5', () => {
     const { steps } = runElect(seedNetwork())
-    expect(steps[0]).toMatchObject({ highlightLine: 5, description: '9 has the highest id among its undecided neighbors, so it becomes a cluster head.' })
-    expect(steps[1]).toMatchObject({ highlightLine: 9, description: '4 joins cluster head 9.' })
+    expect(steps[0]).toMatchObject({ highlightLine: 2, description: 'Every volunteer forgets its cluster head, so the election starts from scratch.' })
+    expect(steps[1]).toMatchObject({ highlightLine: 5, description: '9 has the highest id among its undecided neighbors, so it becomes a cluster head.' })
+    expect(steps[2]).toMatchObject({ highlightLine: 9, description: '4 joins cluster head 9.' })
     expect(steps.at(-1)).toMatchObject({ highlightLine: 11, description: '3 cluster heads and 2 gateways.' })
   })
 })
@@ -65,7 +67,11 @@ describe('advance the day', () => {
 
   it('narrates every tick and ends at line 14', () => {
     const { steps } = runAdvance(seedNetwork('rwp'), 20)
-    expect(steps.filter((s) => s.highlightLine === 4 || s.highlightLine === 5)).toHaveLength(20)
+    expect(steps.filter((s) => s.highlightLine === 4)).toHaveLength(20)
+    expect(steps.filter((s) => s.highlightLine === 12)).toHaveLength(1)
+    expect(steps.filter((s) => s.highlightLine === 10 || s.highlightLine === 12).map((s) => s.description)).toEqual(
+      steps.filter((s) => /no longer hears/.test(s.description)).map((s) => s.description),
+    )
     expect(steps.at(-1)).toMatchObject({ highlightLine: 14, description: 'After 20 ticks the camp elected 1 new head.' })
   })
 

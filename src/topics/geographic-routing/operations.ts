@@ -244,14 +244,16 @@ export function runRoute(state: GeoState, input: unknown): Result {
       const n = nbrs.reduce<string | null>((best, m) => (best === null || dTo(m) < dTo(best) - 1e-9 ? m : best), null)
       if (n !== null && dTo(n) < dTo(v) - 1e-9) {
         const dv = dTo(v)
-        hop(v, n)
         push(
-          `${n} is the neighbor closest to ${dst}: ${fmt(dTo(n))} against ${fmt(dv)}, so the packet moves to ${n}.`,
-          R.greedy,
-          view(n),
-          [{ kind: 'DATA', from: v, to: n }],
-          vars({ n }),
+          `${n} is the neighbor of ${v} closest to ${dst}: ${fmt(dTo(n))} against ${fmt(dv)}.`,
+          R.choose,
+          { ...view(v), nodes: { ...Object.fromEntries(nbrs.map((m) => [m, 'visited' as HighlightKind])), [v]: 'current', [n]: 'new' } },
+          [],
+          vars({ v, n }),
         )
+        why(WHY.choose(n, dst))
+        hop(v, n)
+        push(`The packet moves from ${v} to ${n}.`, R.greedy, view(n), [{ kind: 'DATA', from: v, to: n }], vars({ n }))
         why(WHY.greedy(dst))
         v = n
         continue
@@ -281,12 +283,20 @@ export function runRoute(state: GeoState, input: unknown): Result {
     // GPSR face change: an edge that crosses the line from stuck to dst nearer dst than the last crossing
     // is skipped, and the sweep continues past it onto the next face.
     let n = nextClockwise(work, planar, v, prev, dst)
-    let skipped: string | null = null
+    let skipped = false
     for (let turns = 0; n !== null && turns < 8; turns++) {
       const x = crossing(byId.get(v)!, byId.get(n)!, byId.get(stuck)!, byId.get(dst)!)
       if (!x || dist(x, byId.get(dst)!) >= dist(lastCross, byId.get(dst)!) - 1e-9) break
       lastCross = x
-      skipped = n
+      skipped = true
+      push(
+        `Sweeping clockwise at ${v}, the link to ${n} crosses the line to ${dst}, so the walk skips it and changes face.`,
+        R.sweep,
+        { ...view(v), links: { ...walked, [linkKey(v, n)]: 'dropped' } },
+        [],
+        vars({ v, prev: prev ?? 'None', stuck }),
+      )
+      why(WHY.faceChange(dst))
       n = nextClockwise(work, planar, v, n, dst)
     }
     const again = n !== null && v === stuck && n === firstHop
@@ -296,18 +306,18 @@ export function runRoute(state: GeoState, input: unknown): Result {
       return { steps, finalSnapshot: cloneNet(work) }
     }
     if (walkHops === 0) firstHop = n
+    push(
+      skipped ? `Sweeping on at ${v}, the next link leads to ${n}, so the walk takes it.` : `Sweeping clockwise at ${v}, the first link leads to ${n}.`,
+      R.sweep,
+      { ...view(v), links: { ...walked, [linkKey(v, n)]: 'new' } },
+      [],
+      vars({ v, prev: prev ?? 'None', stuck, n }),
+    )
+    why(skipped ? WHY.nextFace() : WHY.perimeter())
     hop(v, n)
     walkHops += 1
-    push(
-      skipped
-        ? `Sweeping clockwise at ${v}, the link to ${skipped} crosses the line to ${dst}, so the walk changes face and takes the link to ${n}.`
-        : `Sweeping clockwise at ${v}, the first link leads to ${n}.`,
-      R.perimeter,
-      view(n),
-      [{ kind: 'DATA', from: v, to: n }],
-      vars({ prev: v, n }),
-    )
-    why(skipped ? WHY.faceChange(dst) : WHY.perimeter())
+    push(`The packet moves from ${v} to ${n}.`, R.perimeter, view(n), [{ kind: 'DATA', from: v, to: n }], vars({ prev: v, n }))
+    why(WHY.walkHop())
     prev = v
     v = n
     if (v !== dst && dTo(v) < dTo(stuck) - 1e-9) {

@@ -53,8 +53,19 @@ describe('find path from A to E', () => {
 describe('send packets', () => {
   it('takes B down at packet 20 on the ETX path', () => {
     const { steps, finalSnapshot } = runSend(find('etx', 'A E').finalSnapshot, 20)
-    expect(steps[0]).toMatchObject({ highlightLine: 5, description: 'Packet 1 reaches E; relays have B 19, C 59 left.' })
-    expect(steps.at(-1)).toMatchObject({ highlightLine: 9, description: 'B runs out of battery after packet 20, so the path breaks.' })
+    expect(steps.slice(0, 5).map((s) => [s.highlightLine, s.description])).toEqual([
+      [6, 'A sends packet 1 to B.'],
+      [8, 'B forwards packet 1 to C; its battery drops to 19.'],
+      [8, 'C forwards packet 1 to E; its battery drops to 59.'],
+      [11, 'Packet 1 reaches E; relays have B 19, C 59 left.'],
+      [6, 'A sends packet 2 to B.'],
+    ])
+    expect(steps.slice(-4).map((s) => [s.highlightLine, s.description])).toEqual([
+      [8, 'B forwards packet 20 to C; its battery drops to 0.'],
+      [10, 'B runs out of battery after packet 20, so the path breaks.'],
+      [8, 'C forwards packet 20 to E; its battery drops to 40.'],
+      [11, 'Packet 20 reaches E; relays have B 0, C 40 left.'],
+    ])
     expect(finalSnapshot.firstDown).toBe(20)
     expect(runSend(finalSnapshot, 1).steps).toEqual([
       expect.objectContaining({ highlightLine: 4, description: 'The path is broken. Find a new path first.' }),

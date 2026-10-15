@@ -48,13 +48,19 @@ describe('deliver 20 packets', () => {
 
   it('with M, the watchdog loses 1 to 4, reports M, switches, and delivers the rest', () => {
     const { steps, finalSnapshot } = runDeliver(found('etx-watchdog', true).finalSnapshot, 20)
-    expect(steps.slice(6, 10).map((s) => [s.highlightLine, s.description])).toEqual([
+    const at = steps.findIndex((s) => s.description === 'S sends packet 4 to M: ACK on try 1.')
+    expect(steps.slice(at, at + 9).map((s) => [s.highlightLine, s.description])).toEqual([
+      [8, 'S sends packet 4 to M: ACK on try 1.'],
+      [6, 'M drops packet 4 without a trace.'],
       [12, 'S never hears M forward packet 4: 4 failures for M.'],
       [12, 'M passed the threshold of 3, so S reports it.'],
       [12, 'The pathrater avoids M: S switches to S, A, B, C, D.'],
-      [6, 'M drops packet 4 without a trace.'],
+      [8, 'S sends packet 5 to A: ACK on try 1.'],
+      [12, 'S hears A forward packet 5.'],
+      [8, 'A sends packet 5 to B: ACK on try 1.'],
+      [12, 'A hears B forward packet 5.'],
     ])
-    expect(steps[10]).toMatchObject({ highlightLine: 13, description: 'Packet 5 reaches D after 4 transmissions.' })
+    expect(steps.find((s) => s.highlightLine === 13)).toMatchObject({ description: 'Packet 5 reaches D after 4 transmissions.' })
     expect(steps.at(-1)?.description).toBe('16 of 20 packets reached D: 80.0 %.')
     expect(finalSnapshot.flagged).toEqual(['M'])
   })

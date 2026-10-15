@@ -20,6 +20,11 @@ describe('route S to D on the seed, greedy with perimeter', () => {
 
   it('walks S, A, B, C clockwise, then resumes greedy at C (1.80)', () => {
     expect(steps.filter((s) => s.highlightLine === 15).map((s) => s.description)).toEqual([
+      'The packet moves from S to A.',
+      'The packet moves from A to B.',
+      'The packet moves from B to C.',
+    ])
+    expect(steps.filter((s) => s.highlightLine === 14).map((s) => s.description)).toEqual([
       'Sweeping clockwise at S, the first link leads to A.',
       'Sweeping clockwise at A, the first link leads to B.',
       'Sweeping clockwise at B, the first link leads to C.',
@@ -31,13 +36,17 @@ describe('route S to D on the seed, greedy with perimeter', () => {
 
   it('finishes greedily through E and delivers after 5 hops on the slide route', () => {
     expect(steps.filter((s) => s.highlightLine === 8).map((s) => s.description)).toEqual([
-      'E is the neighbor closest to D: 0.95 against 1.80, so the packet moves to E.',
-      'D is the neighbor closest to D: 0.00 against 0.95, so the packet moves to D.',
+      'The packet moves from C to E.',
+      'The packet moves from E to D.',
+    ])
+    expect(steps.filter((s) => s.highlightLine === 6).map((s) => s.description)).toEqual([
+      'E is the neighbor of C closest to D: 0.95 against 1.80.',
+      'D is the neighbor of E closest to D: 0.00 against 0.95.',
     ])
     expect(steps.at(-1)).toMatchObject({ highlightLine: 18, description: 'The packet reaches D after 5 hops.' })
     expect(finalSnapshot.path).toEqual(['S', 'A', 'B', 'C', 'E', 'D'])
     expect(finalSnapshot).toMatchObject({ hops: 5, voids: 1, mode: 'greedy' })
-    expect(lines).toEqual([2, 10, 15, 15, 15, 17, 8, 8, 18])
+    expect(lines).toEqual([2, 10, 14, 15, 14, 15, 14, 15, 17, 6, 8, 6, 8, 18])
   })
 })
 

@@ -52,6 +52,6 @@ export const campPseudocode: Record<string, string[]> = {
 export const L = {
   join: { def: 1, place: 2, skip: 5, buddy: 6, wait: 9, cluster: 10 },
   elect: { def: 1, none: 2, head: 5, member: 9, done: 11, gateway: 13 },
-  advance: { def: 1, calm: 4, changes: 5, done: 14 },
+  advance: { def: 1, calm: 4, rejoin: 10, becomes: 12, done: 14 },
   metrics: ML,
 } as const

@@ -49,6 +49,11 @@ describe('discover, DSR', () => {
   it('picks the first of two equal routes and caches it at S', () => {
     expect(steps.find((s) => s.highlightLine === 17)?.description).toBe('D picks S, A, C, D: 3 hops, the first to arrive.')
     expect(steps.at(-1)?.description).toBe('S stores S, A, C, D in its route cache.')
+    expect(steps.filter((s) => s.highlightLine === 18).map((s) => [s.description, s.snapshot.packets])).toEqual([
+      ['The RREP goes from D to C, carrying S, A, C, D.', [{ kind: 'RREP', from: 'D', to: 'C' }]],
+      ['The RREP goes from C to A, carrying S, A, C, D.', [{ kind: 'RREP', from: 'C', to: 'A' }]],
+      ['The RREP reaches S from A, carrying S, A, C, D.', [{ kind: 'RREP', from: 'A', to: 'S' }]],
+    ])
     expect(finalSnapshot.cache.S.D).toEqual(['S', 'A', 'C', 'D'])
   })
 })
@@ -99,7 +104,9 @@ describe('break link', () => {
       'Link C-D breaks.',
       'C sends an RERR toward S.',
       'C deletes its route to D, which used C-D.',
+      'The RERR goes from C to A.',
       'A deletes its route to D, which used C-D.',
+      'The RERR goes from A to S.',
       'S deletes its route to D, which used C-D.',
       'D also sends an RERR, since it sits at the other end of C-D.',
       'S has no route to D now; its next discovery uses request id 2.',
@@ -113,7 +120,14 @@ describe('break link', () => {
   it('deletes the cached route under DSR', () => {
     const found = runDiscover(seedNetwork('dsr'), 'S D').finalSnapshot
     const { steps, finalSnapshot } = runBreakLink(found, 'C D')
-    expect(descs(steps)).toContain('S deletes the cached route S, A, C, D.')
+    expect(descs(steps).slice(1)).toEqual([
+      'C sends an RERR toward S.',
+      'The RERR goes from C to A.',
+      'The RERR goes from A to S.',
+      'S deletes the cached route S, A, C, D.',
+      'D also sends an RERR, since it sits at the other end of C-D.',
+      'S has no route to D now; its next discovery uses request id 2.',
+    ])
     expect(finalSnapshot.cache.S.D).toBeUndefined()
     expect(runDiscover(finalSnapshot, 'S D').finalSnapshot.cache.S.D).toEqual(['S', 'B', 'E', 'D'])
   })

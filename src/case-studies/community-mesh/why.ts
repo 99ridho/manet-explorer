@@ -14,6 +14,10 @@ export const WHY = {
   drop: () => 'M pulled the route toward itself on purpose. It throws the data away, and nothing tells S the packet was lost.',
   lost: (v: string, nxt: string) =>
     `Each try on ${v}-${nxt} needs the packet and its acknowledgment to arrive. After 4 failed tries ${v} gives up, so a weak link loses packets.`,
+  ack: (t: number) =>
+    t === 0 ? 'The frame and its acknowledgment both arrived, so the hop is done.' : 'A retry got through this time, which is why weak links cost extra transmissions.',
+  noAck: (v: string, nxt: string) => `The frame or its acknowledgment was lost on ${v}-${nxt}, so ${v} tries again, up to 4 times.`,
+  heard: (v: string, nxt: string) => `${v} listens after handing the packet on. Hearing ${nxt} forward it shows ${nxt} did its job.`,
   delivered: () => 'Every hop got the packet through, sometimes after retries; the count shows how many transmissions it took.',
   silence: (v: string) => `${v} handed the packet on and listened, but M stayed quiet. One miss can be a collision, so the watchdog only counts it.`,
   report: (v: string) =>

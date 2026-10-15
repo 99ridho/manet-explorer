@@ -52,7 +52,7 @@ export const sarPseudocode: Record<string, string[]> = {
 
 /** Line numbers the operations highlight, per listing. */
 export const L = {
-  discover: { def: 1, start: 2, silent: 9, transmit: 10, dup: 13, first: 15, rrep: 17 },
+  discover: { def: 1, start: 2, gateway: 7, silent: 9, transmit: 10, dup: 13, first: 15, rrep: 17, relays: 19 },
   send: { def: 1, noRoute: 3, lookup: 6, forward: 7, done: 9 },
   walk: { def: 1, move: 2, rerr: 4, remove: 5, cut: 7, ok: 8 },
   metrics: ML,

@@ -55,17 +55,19 @@ export const qosPseudocode: Record<string, string[]> = {
     '    for p in range(1, k + 1):',
     '        if has_down_relay(path):',
     '            return  # the path is broken; find a new path first',
-    '        send_along(path, DATA(p))',
-    '        for r in path[1:-1]:  # the relays, not src or dst',
-    '            r.battery -= 1',
-    '            if r.battery == 0:',
-    '                r.down = True',
+    '        for v, nxt in zip(path, path[1:]):',
+    '            v.send(DATA(p), to=nxt)',
+    '            if v != path[0]:  # a relay, not src',
+    '                v.battery -= 1',
+    '                if v.battery == 0:',
+    '                    v.down = True',
+    '        net.count(p)  # p reached dst',
   ],
 }
 
 /** Line numbers the operations highlight, per listing family. */
 export const L = {
   bfs: { def: 1, prune: 2, settle: 5, found: 7, same: 9, improved: 10, none: 12 },
-  best: { def: 1, settle: 5, found: 7, same: 12, improved: 13, none: 14 },
-  send: { def: 1, stop: 4, packet: 5, down: 9 },
+  best: { def: 1, settle: 5, found: 7, skip: 10, same: 12, improved: 13, none: 14 },
+  send: { def: 1, stop: 4, hop: 6, relay: 8, down: 10, packet: 11 },
 } as const

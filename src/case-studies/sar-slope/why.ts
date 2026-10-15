@@ -3,6 +3,8 @@
 export const WHY = {
   needTeam: () => 'Reports start at a team radio, so the run needs T1, T2, or T3.',
   start: (src: string) => `${src} has a report but no route to the base camp. The radios only search when someone has data, so the search starts now.`,
+  gatewayAnswers: () => 'G is the base the team is looking for, so the search ends here and G sends the answer back.',
+  relays: (v: string, from: string) => `${from} picked ${v} as one of its relays, so ${v} repeats the RREQ for the radios two hops from ${from}.`,
   silent: (v: string, from: string) =>
     `${from} did not choose ${v} as a relay, because its chosen relays already reach the radios beyond. A repeat from ${v} would mostly add duplicates.`,
   transmitSrc: (v: string) => `${v} does not know the way to G, so it asks every radio in range at once.`,
@@ -19,6 +21,7 @@ export const WHY = {
   needRadio: () => 'Only a radio that is still on the slope can walk away, and the gateway stays at base camp.',
   before: (u: string) => `${u} still has its links on this step, so you can see which radios are about to lose it.`,
   gone: (u: string) => `${u} is out of everyone's range, so every link it had is gone.`,
+  rerrHop: (n: string) => `The warning moves one radio at a time toward the team, and ${n} is the next radio that used the route.`,
   rerr: (src: string) => `The radios between ${src} and the gap still think the route works. The RERR warns them so they stop sending into nothing.`,
   delete: (n: string) => `A route through a radio that left only loses reports, so ${n} throws it away.`,
   cut: (u: string) => `Every path from the team to G went through ${u}. A relay like that is the one the team cannot afford to lose.`,

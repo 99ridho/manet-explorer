@@ -150,7 +150,7 @@ function buddySplit(work: AddressSnapshot, push: Push, why: Why, x: string, via:
   }
   const target = pool.reduce((best, r) => (size(r) > size(best) ? r : best))
   const [lo, hi] = target
-  push(`${via} splits ${rangeText(target)} in half.`, line ?? J.split, hl('new'), [], at({ lo, hi }))
+  push(`${via} splits ${rangeText(target)} in half.`, line ?? J.split, hl('new'), [{ kind: 'JOIN', from: x, to: via }], at({ lo, hi }))
   why(WHY.split(via))
   const mid = Math.floor((lo + hi) / 2)
   let keep: Range = [lo, mid]
@@ -159,7 +159,13 @@ function buddySplit(work: AddressSnapshot, push: Push, why: Why, x: string, via:
   if (own != null && own > mid && own <= hi) [keep, give] = [give, keep]
   work.pool[via] = pool.map((r) => (r === target ? keep : r))
   work.pool[x] = [give]
-  push(`${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${x}.`, line ?? J.hand, hl('new'), [], at({ keep: rangeTuple(keep), give: rangeTuple(give) }))
+  push(
+    `${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${x}.`,
+    line ?? J.hand,
+    hl('new'),
+    [{ kind: 'POOL', from: via, to: x, label: rangeText(give) }],
+    at({ keep: rangeTuple(keep), give: rangeTuple(give) }),
+  )
   why(WHY.hand(via))
   work.address[x] = give[0]
   push(`${x} takes address ${give[0]} without asking any other node.`, line ?? J.address, { nodes: { [x]: 'found' } }, [], at({ give: rangeTuple(give) }))
@@ -167,19 +173,19 @@ function buddySplit(work: AddressSnapshot, push: Push, why: Why, x: string, via:
   return true
 }
 
-/** Nodes x can reach in the main network, in node order, with their hop counts from x. */
-function reach(work: AddressSnapshot, x: string): Map<string, number> {
-  const hops = new Map([[x, 0]])
+/** Nodes x can reach in the main network, in BFS order, with the node each first heard the flood from. */
+function reach(work: AddressSnapshot, x: string): Map<string, string | null> {
+  const parent = new Map<string, string | null>([[x, null]])
   const queue = [x]
   while (queue.length) {
     const v = queue.shift()!
     for (const n of neighbors(work, v)) {
-      if (hops.has(n)) continue
-      hops.set(n, hops.get(v)! + 1)
+      if (parent.has(n)) continue
+      parent.set(n, v)
       queue.push(n)
     }
   }
-  return hops
+  return parent
 }
 
 /** The QDAD loop of lines 2 to 13 for node x, drawing addresses from `rng`. */
@@ -191,27 +197,39 @@ function qdadPick(work: AddressSnapshot, push: Push, why: Why, x: string, via: s
   why(WHY.pick(x))
   let tries = 0
   for (let picks = 0; tries < QDAD_TRIES && picks < 50; ) {
-    const hops = reach(work, x)
-    work.control += hops.size
-    push(
-      `${x} floods AREQ ${a} (try ${tries + 1} of ${QDAD_TRIES}).`,
-      line ?? Q.flood,
-      { nodes: { [x]: 'current' } },
-      [{ kind: 'AREQ', from: x, to: '*', label: `${a}` }],
-      at({ a, tries }),
-    )
-    why(WHY.flood(x, a))
-    const owner = work.nodes.map((n) => n.id).find((n) => n !== x && hops.has(n) && work.address[n] === a)
-    if (owner) {
-      work.control += hops.get(owner)!
+    const parent = reach(work, x)
+    // Every node the flood reaches rebroadcasts the AREQ once, in the order it first heard it.
+    const heard: Record<string, HighlightKind> = {}
+    for (const [v, from] of parent) {
+      work.control += 1
+      const out = neighbors(work, v).map((n) => ({ kind: 'AREQ', from: v, to: n, label: `${a}` }))
       push(
-        `${owner} already uses ${a}, so it answers with an AREP and ${x} picks again.`,
-        line ?? Q.owner,
-        { nodes: { [x]: 'current', [owner]: 'flagged' } },
-        [],
-        at({ a, owner }),
+        from === null ? `${x} floods AREQ ${a} (try ${tries + 1} of ${QDAD_TRIES}).` : `${v} hears AREQ ${a} from ${from} and rebroadcasts it.`,
+        line ?? Q.flood,
+        { nodes: { ...heard, [v]: 'current' } },
+        out,
+        at({ a, tries }),
       )
+      why(from === null ? WHY.flood(x, a) : WHY.relay(v))
+      heard[v] = 'visited'
+    }
+    const owner = work.nodes.map((n) => n.id).find((n) => n !== x && parent.has(n) && work.address[n] === a)
+    if (owner) {
+      push(`${owner} already uses ${a}, so it answers with an AREP.`, line ?? Q.found, { nodes: { ...heard, [owner]: 'flagged' } }, [], at({ a, owner }))
       why(WHY.owner(owner, x))
+      for (let w = owner; w !== x; ) {
+        const next = parent.get(w)!
+        work.control += 1
+        push(
+          next === x ? `The AREP for ${a} reaches ${x} from ${w}, so ${x} picks again.` : `The AREP for ${a} goes from ${w} to ${next}.`,
+          line ?? Q.owner,
+          { nodes: { [owner]: 'flagged', [next]: 'current' } },
+          [{ kind: 'AREP', from: w, to: next, label: `${a}` }],
+          at({ a, owner }),
+        )
+        why(next === x ? WHY.arepHome(x) : WHY.arepHop())
+        w = next
+      }
       a = randInt(rng, 1, SPACE)
       picks += 1
       tries = 0
@@ -291,8 +309,17 @@ export function runLeaveBuddy(state: AddressState, input: unknown): Result {
   }
   const mine = work.pool[u]
   const touches = (other: Range[]) => other.some((r) => mine.some((m) => r[1] + 1 === m[0] || m[1] + 1 === r[0]))
-  const b = nbrs.find((n) => touches(work.pool[n])) ?? nbrs[0]
+  const next = nbrs.find((n) => touches(work.pool[n]))
+  const b = next ?? nbrs[0]
   const hl = { nodes: { [u]: 'current' as HighlightKind, [b]: 'new' as HighlightKind }, links: { [linkKey(u, b)]: 'active' as HighlightKind } }
+  push(
+    next ? `${b} holds a range next to ${u}'s, so ${b} is ${u}'s buddy.` : `No neighbor holds a range next to ${u}'s, so ${u} picks its first neighbor, ${b}.`,
+    V.buddy,
+    hl,
+    [],
+    { b },
+  )
+  why(next ? WHY.buddy(b) : WHY.firstNeighbor())
   push(`${u} says goodbye and hands ${mine.length ? rangesText(mine) : 'no range'} to ${b}.`, V.hand, hl, [{ kind: 'BYE', from: u, to: b }], { b })
   why(WHY.handBack(u))
   work.pool[b] = mergeTouching([...work.pool[b], ...mine])

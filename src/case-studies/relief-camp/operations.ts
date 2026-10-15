@@ -1,6 +1,6 @@
 // SPEC.md §19.2: volunteers join with Buddy addresses, elect cluster heads by highest ID, and move
 // through the day as teams (RPGM) or alone (RWP); the metrics run compares the two.
-import { cloneNet, linkKey, listIds, makeLink, neighbors, plural, recorder } from '@/lib/net'
+import { cloneNet, linkKey, listIds, makeLink, neighbors, plural, pyList, recorder } from '@/lib/net'
 import { dist } from '@/lib/sim/geometry'
 import { freeSpot } from '@/lib/sim/placement'
 import { pushMetricsSteps } from '@/lib/sim/metrics'
@@ -66,6 +66,24 @@ function syncRoles(s: CampSnapshot) {
 function computeGateways(s: CampSnapshot) {
   s.gateways = s.nodes.map((n) => n.id).filter((n) => s.head[n] && !isHead(s, n) && headsInRange(s, n).length >= 2)
   syncRoles(s)
+}
+
+/** One step per node that gained or lost the gateway role since `before`. */
+function gatewaySteps(s: CampSnapshot, before: string[], push: Push, why: Why, line: number) {
+  for (const n of s.nodes.map((x) => x.id)) {
+    const was = before.includes(n)
+    const is = s.gateways.includes(n)
+    if (was === is) continue
+    const heads = headsInRange(s, n)
+    push(
+      is
+        ? `${n} now hears cluster heads ${listIds(heads)}, so it becomes a gateway.`
+        : `${n} no longer hears two cluster heads, so it stops being a gateway.`,
+      line,
+      view(s, { [n]: is ? 'new' : 'dropped' }),
+    )
+    why(is ? WHY.gateway(n) : WHY.noLongerGateway(n))
+  }
 }
 
 export function clusterLinks(s: CampSnapshot): Record<string, HighlightKind> {
@@ -226,6 +244,10 @@ export function runJoin(state: CampState, input: unknown): Result {
       continue
     }
     via = n
+    push(`${n} has a spare address, so ${u} asks ${n} to join through it.`, J.buddy, { nodes: { [n]: 'current', [u]: 'new' } }, [{ kind: 'JOIN', from: u, to: n }], {
+      n,
+    })
+    why(WHY.ask(n))
     break
   }
   if (!via) {
@@ -238,12 +260,15 @@ export function runJoin(state: CampState, input: unknown): Result {
   push(`${via} splits ${rangeText(whole)} in half.`, J.buddy, hl, [], { n: via })
   why(WHY.split(via))
   const { keep, give } = split(work, via, u)
-  push(`${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${u}.`, J.buddy, hl, [], { n: via })
+  push(`${via} keeps ${rangeText(keep)} and gives ${rangeText(give)} to ${u}.`, J.buddy, hl, [{ kind: 'POOL', from: via, to: u, label: rangeText(give) }], {
+    n: via,
+  })
   why(WHY.hand(via))
   push(`${u} takes address ${give[0]} without asking any other node.`, J.buddy, { nodes: { [u]: 'found' } }, [], { n: via })
   why(WHY.address(u))
 
   at('clusters')
+  const gatewaysBefore = work.gateways
   const heads = headsInRange(work, u)
   if (heads.length) {
     const h = best(heads)
@@ -258,6 +283,7 @@ export function runJoin(state: CampState, input: unknown): Result {
     push(`${u} hears no cluster head, so it becomes one.`, J.cluster, view(work, { [u]: 'found' }))
     why(WHY.newHead(u))
   }
+  gatewaySteps(work, gatewaysBefore, push, why, J.cluster)
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
@@ -275,6 +301,8 @@ export function runElect(state: CampState): Result {
     why(WHY.noneToElect())
     return { steps, finalSnapshot: cloneNet(work) }
   }
+  push('Every volunteer forgets its cluster head, so the election starts from scratch.', E.none, view(work))
+  why(WHY.cleared())
   elect(work, push, why)
   for (const n of work.nodes.map((x) => x.id).filter((n) => work.head[n] && !isHead(work, n) && headsInRange(work, n).length >= 2)) {
     work.gateways = [...work.gateways, n]
@@ -288,34 +316,37 @@ export function runElect(state: CampState): Result {
   return { steps, finalSnapshot: cloneNet(work) }
 }
 
+interface HeadChange {
+  v: string
+  old: string
+  head: string | null // the head v joined, or null when v became a head
+}
+
 /** One tick in place: move, relink, and let every member that lost its head find another. */
-export function tickCamp(s: CampSnapshot): { lost: number; joined: number; became: number } {
+export function tickCamp(s: CampSnapshot): HeadChange[] {
   const before = s.links
   moveAll(tickRng(s.seed, s.tick), s.nodes, s.motion, PARAMS, s.groups)
   s.links = unitDiskLinks(s.nodes, s.range)
   recordLinks(s, before, s.links, s.nodes)
   for (const n of s.nodes) s.history.push({ x: n.x, y: n.y })
   s.tick += 1
-  let lost = 0
-  let joined = 0
-  let became = 0
+  const changes: HeadChange[] = []
   for (const v of s.nodes.map((n) => n.id)) {
     const h = s.head[v]
     if (!h || h === v) continue
     if (neighbors(s, v).includes(h)) continue
-    lost += 1
     const heads = headsInRange(s, v)
     if (heads.length) {
       s.head = { ...s.head, [v]: best(heads) }
-      joined += 1
+      changes.push({ v, old: h, head: best(heads) })
     } else {
       s.head = { ...s.head, [v]: v }
       s.elections += 1
-      became += 1
+      changes.push({ v, old: h, head: null })
     }
   }
   computeGateways(s)
-  return { lost, joined, became }
+  return changes
 }
 
 export function runAdvance(state: CampState, input: unknown): Result {
@@ -333,21 +364,30 @@ export function runAdvance(state: CampState, input: unknown): Result {
   }
   const start = work.elections
   for (let i = 0; i < ticks; i++) {
-    const { lost, joined, became } = tickCamp(work)
-    if (lost === 0) {
+    const changes = tickCamp(work)
+    if (changes.length === 0) {
       work.focus = 'movement'
       push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and every member still hears its head.`, A.calm, view(work), [], { t: i })
       why(WHY.calm())
-    } else {
-      work.focus = 'clusters'
+      continue
+    }
+    work.focus = 'movement'
+    push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and ${plural(changes.length, 'volunteer')} lost their head.`, A.calm, view(work), [], {
+      t: i,
+    })
+    why(WHY.changes())
+    work.focus = 'clusters'
+    for (const { v, old, head } of changes) {
       push(
-        `Tick ${work.tick}: ${plural(lost, 'volunteer')} lost their head; ${joined} joined another head and ${became} became heads.`,
-        A.changes,
-        view(work),
+        head
+          ? `${v} no longer hears ${old}, so it joins cluster head ${head}.`
+          : `${v} no longer hears ${old} and hears no other head, so it becomes a head.`,
+        head ? A.rejoin : A.becomes,
+        view(work, { [v]: head ? 'new' : 'found' }),
         [],
-        { t: i },
+        { t: i, v, heads: head ? pyList(headsInRange(work, v)) : pyList([]) },
       )
-      why(WHY.changes())
+      why(head ? WHY.rejoin(v) : WHY.becomes(v))
     }
   }
   work.focus = 'clusters'

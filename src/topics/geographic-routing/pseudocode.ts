@@ -24,5 +24,5 @@ export const geoPseudocode: Record<string, string[]> = {
 
 /** Line numbers the operation highlights. */
 export const L = {
-  route: { def: 1, planarize: 2, greedy: 8, void: 10, drop: 12, stuck: 14, perimeter: 15, resume: 17, deliver: 18 },
+  route: { def: 1, planarize: 2, choose: 6, greedy: 8, void: 10, drop: 12, stuck: 14, sweep: 14, perimeter: 15, resume: 17, deliver: 18 },
 } as const

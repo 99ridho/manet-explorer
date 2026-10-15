@@ -178,7 +178,11 @@ function findBest(work: QosSnapshot, push: Push, why: Why, src: string, dst: str
       return
     }
     for (const n of neighbors(work, v)) {
-      if (done.has(n)) continue
+      if (done.has(n)) {
+        push(`${n} is already settled, so ${v} skips it.`, B.skip, { nodes: { [v]: 'current', [n]: 'visited' } }, [], { v, n })
+        why(WHY.settled(n))
+        continue
+      }
       const x = energy
         ? n === dst
           ? value.get(v)!
@@ -260,13 +264,28 @@ export function runSend(state: QosState, input: unknown): Result {
     }
     const p = work.sent + 1
     work.sent = p
-    const out: string[] = []
-    for (const r of relays) {
-      const node = work.nodes.find((n) => n.id === r)!
+    for (let h = 0; h + 1 < path.length; h++) {
+      const [v, nxt] = [path[h], path[h + 1]]
+      const packets = [{ kind: 'DATA', from: v, to: nxt, label: `${p}` }]
+      const done = { links: treeOf(path), path }
+      if (h === 0) {
+        push(`${v} sends packet ${p} to ${nxt}.`, S.hop, { ...done, nodes: { [nxt]: 'current' } }, packets, { p, v, nxt })
+        why(WHY.hop(nxt))
+        continue
+      }
+      const node = work.nodes.find((n) => n.id === v)!
       node.battery = (node.battery ?? 0) - 1
+      push(`${v} forwards packet ${p} to ${nxt}; its battery drops to ${node.battery}.`, S.relay, { ...done, nodes: { [v]: 'current' } }, packets, {
+        p,
+        v,
+        nxt,
+      })
+      why(WHY.relayCost(v))
       if (node.battery === 0) {
         node.down = true
-        out.push(r)
+        if (work.firstDown === null) work.firstDown = p
+        push(`${v} runs out of battery after packet ${p}, so the path breaks.`, S.down, { nodes: { [v]: 'dropped' } }, [], { p, v })
+        why(WHY.down(v))
       }
     }
     push(
@@ -274,16 +293,11 @@ export function runSend(state: QosState, input: unknown): Result {
         ? `Packet ${p} reaches ${dst}; relays have ${relays.map((r) => `${r} ${battery(work, r)}`).join(', ')} left.`
         : `Packet ${p} reaches ${dst}; there is no relay on this path.`,
       S.packet,
-      { links: treeOf(path), path },
-      [{ kind: 'DATA', from: path[path.length - 2], to: dst, label: `${p}` }],
+      { nodes: { [dst]: 'found' }, links: treeOf(path), path },
+      [],
       { p },
     )
     why(WHY.packet())
-    for (const r of out) {
-      if (work.firstDown === null) work.firstDown = p
-      push(`${r} runs out of battery after packet ${p}, so the path breaks.`, S.down, { nodes: { [r]: 'dropped' } }, [], { p, r })
-      why(WHY.down(r))
-    }
   }
   return { steps, finalSnapshot: cloneNet(work) }
 }

@@ -47,13 +47,17 @@ describe('move M3 next to M6', () => {
       const { steps, finalSnapshot } = runMove(seedNetwork(update), 'M3 M6')
 
       it('opens with the move, the stale routes, and the new sequence number', () => {
-        expect(steps.slice(0, 4).map((s) => [s.highlightLine, s.description])).toEqual([
+        expect(steps.slice(0, 8).map((s) => [s.highlightLine, s.description])).toEqual([
           [2, 'M3 moves next to M6: it loses M2 and gains M6 as neighbors.'],
-          [4, 'M3 deletes 5 routes that went through M2.'],
-          [4, 'M2 deletes 1 route that went through M3.'],
+          [4, 'M3 deletes its route to M1: next hop M2 is no longer a neighbor.'],
+          [4, 'M3 deletes its route to M2: next hop M2 is no longer a neighbor.'],
+          [4, 'M3 deletes its route to M4: next hop M2 is no longer a neighbor.'],
+          [4, 'M3 deletes its route to M5: next hop M2 is no longer a neighbor.'],
+          [4, 'M3 deletes its route to M6: next hop M2 is no longer a neighbor.'],
+          [4, 'M2 deletes its route to M3: next hop M3 is no longer a neighbor.'],
           [5, 'M3 raises its own sequence number to 194.'],
         ])
-        expect(steps[4]).toMatchObject({ highlightLine: 7, description: 'M6 is a new neighbor, so it sends M3 its full table of 6 rows.' })
+        expect(steps[8]).toMatchObject({ highlightLine: 7, description: 'M6 is a new neighbor, so it sends M3 its full table of 6 rows.' })
       })
 
       it('M2 learns of the move through M4, and no other row of M2 changes', () => {

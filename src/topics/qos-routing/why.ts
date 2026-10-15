@@ -25,7 +25,10 @@ export const WHY = {
   packets: () => 'Send packets runs 1 to 50 packets, one at a time.',
   noPath: () => 'Packets follow the path found last, and there is none yet.',
   broken: () => 'A relay with an empty battery cannot forward anything, so packets on this path would be lost.',
-  packet: () => 'Forwarding takes energy, so every packet costs each relay one unit of battery.',
+  hop: (nxt: string) => `Packets follow the path that was found, so the first hop goes to ${nxt}.`,
+  relayCost: (v: string) => `Forwarding takes energy, so every packet ${v} relays costs it one unit of battery.`,
+  packet: () => 'The packet arrived. The battery counts show how much the path has spent so far.',
+  settled: (n: string) => `${n} already has its best value, so no later path through another node can improve it.`,
   down: (r: string) =>
     `${r}'s battery is empty, so it switches off. One empty relay breaks the whole path, which is why network lifetime differs from total energy (Loo p. 203).`,
 }

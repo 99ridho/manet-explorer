@@ -156,8 +156,18 @@ export function runDiscover(state: SarState, input: unknown): Result {
   const queue: [string, string | null][] = [[src, null]]
   while (queue.length) {
     const [v, from] = queue.shift()!
-    if (v === GATEWAY) continue
-    if (from !== null && mpr && !work.mpr[from]?.includes(v)) {
+    if (v === GATEWAY) {
+      push('G receives the RREQ, so it answers instead of relaying.', D.gateway, { nodes: { ...got, [v]: 'found' }, links: { ...reached } }, [], {
+        v,
+        heard_from: from ?? 'None',
+      })
+      why(WHY.gatewayAnswers())
+      continue
+    }
+    if (from !== null && mpr && work.mpr[from]?.includes(v)) {
+      push(`${v} is an MPR of ${from}, so it relays.`, D.relays, { nodes: { ...got, [v]: 'current' }, links: { ...reached } }, [], { v, heard_from: from })
+      why(WHY.relays(v, from))
+    } else if (from !== null && mpr) {
       push(`${v} is not an MPR of ${from}, so it does not relay.`, D.silent, { nodes: { ...got }, links: { ...reached } }, [], { v, heard_from: from })
       why(WHY.silent(v, from))
       continue
@@ -173,14 +183,14 @@ export function runDiscover(state: SarState, input: unknown): Result {
       if (seen.has(n)) {
         work.dupes += 1
         work.dupBy = { ...work.dupBy, [n]: (work.dupBy[n] ?? 0) + 1 }
-        push(`${n} already has the RREQ, so this copy is a duplicate.`, D.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...reached } }, [], { v, n })
+        push(`${n} already has the RREQ, so this copy is a duplicate.`, D.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...reached } }, [{ kind: 'RREQ', from: v, to: n }], { v, n })
         why(WHY.dup(n))
         continue
       }
       seen.add(n)
       work.reverse = { ...work.reverse, [n]: v }
       reached[linkKey(v, n)] = 'tree'
-      push(`${n} records ${v} as its way back to ${src}.`, D.first, { nodes: { ...got, [n]: 'new' }, links: { ...reached, [linkKey(v, n)]: 'new' } }, [], { v, n })
+      push(`${n} records ${v} as its way back to ${src}.`, D.first, { nodes: { ...got, [n]: 'new' }, links: { ...reached, [linkKey(v, n)]: 'new' } }, [{ kind: 'RREQ', from: v, to: n }], { v, n })
       why(WHY.first(n, src))
       got[n] = 'visited'
       queue.push([n, v])
@@ -277,13 +287,15 @@ export function runWalkAway(state: SarState, input: unknown): Result {
     const src = route[0]
     if (at > 0) {
       const up = route[at - 1]
-      push(`${up} sends an RERR toward ${src}.`, W.rerr, { nodes: { [up]: 'current' } }, up === src ? [] : [{ kind: 'RERR', from: up, to: route[at - 2] }], {
-        node: up,
-      })
+      push(`${up} sends an RERR toward ${src}.`, W.rerr, { nodes: { [up]: 'current' } }, [], { node: up })
       why(WHY.rerr(src))
     }
     for (let i = at - 1; i >= 0; i--) {
       const n = route[i]
+      if (i < at - 1) {
+        push(`The RERR goes from ${route[i + 1]} to ${n}.`, W.rerr, { nodes: { [n]: 'current' } }, [{ kind: 'RERR', from: route[i + 1], to: n }], { node: n })
+        why(WHY.rerrHop(n))
+      }
       push(`${n} deletes its route to G, which went through ${u}.`, W.remove, { nodes: { [n]: 'dropped' } }, [], { node: n })
       why(WHY.delete(n))
       const next = { ...work.route }

@@ -154,6 +154,8 @@ function deliverOne(work: MeshSnapshot, p: number, push?: Push, why?: Why) {
       work.focus = 'route'
       push?.(`M drops packet ${p} without a trace.`, D.drop, { nodes: { [v]: 'dropped' }, links: tree(route) }, [], { p, v })
       why?.(WHY.drop())
+      // The watcher only notices once M has dropped the packet it should have forwarded.
+      if (work.routing === 'etx-watchdog' && h > 0) watch(work, route[h - 1], v, p, push, why)
       return
     }
     const link = findLink(work, v, nxt)!
@@ -163,6 +165,15 @@ function deliverOne(work: MeshSnapshot, p: number, push?: Push, why?: Why) {
       tries += 1
       work.tries += 1
       sent = rng() < ok
+      work.focus = 'links'
+      push?.(
+        sent ? `${v} sends packet ${p} to ${nxt}: ACK on try ${t + 1}.` : `${v} sends packet ${p} to ${nxt}: no ACK on try ${t + 1} of ${TRIES}.`,
+        D.send,
+        { nodes: { [nxt]: sent ? 'current' : 'flagged' }, links: { ...tree(route), [linkKey(v, nxt)]: sent ? 'active' : 'dropped' } },
+        [{ kind: 'DATA', from: v, to: nxt, label: `${p}` }],
+        { p, v, nxt },
+      )
+      why?.(sent ? WHY.ack(t) : WHY.noAck(v, nxt))
     }
     if (!sent) {
       work.dropped += 1
@@ -177,14 +188,19 @@ function deliverOne(work: MeshSnapshot, p: number, push?: Push, why?: Why) {
       why?.(WHY.lost(v, nxt))
       return
     }
-    if (work.routing === 'etx-watchdog' && isBlackHole(work, nxt)) watch(work, v, nxt, p, push, why)
+    if (work.routing === 'etx-watchdog' && nxt !== DST && !isBlackHole(work, nxt)) {
+      work.focus = 'trust'
+      push?.(`${v} hears ${nxt} forward packet ${p}.`, D.watch, { nodes: { [v]: 'current' }, links: tree(route) }, [], { p, v, nxt })
+      why?.(WHY.heard(v, nxt))
+    }
   }
   work.delivered += 1
   work.transmissions = [...work.transmissions, tries]
   work.focus = 'route'
-  push?.(`Packet ${p} reaches D after ${tries} transmissions.`, D.delivered, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [
-    { kind: 'DATA', from: route[route.length - 2], to: DST, label: `${p}` },
-  ], { p, delivered: 'True' })
+  push?.(`Packet ${p} reaches D after ${tries} transmissions.`, D.delivered, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [], {
+    p,
+    delivered: 'True',
+  })
   why?.(WHY.delivered())
 }
 

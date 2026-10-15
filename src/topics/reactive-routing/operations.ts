@@ -167,8 +167,9 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
     why(dsr ? WHY.broadcastDsr(v, dst) : WHY.broadcastAodv(v, dst))
     for (const n of nbrs) {
       const key = linkKey(v, n)
+      const copy = [{ kind: 'RREQ', from: v, to: n, label: `${id}` }]
       if (dsr && record.includes(n)) {
-        push(`${n} is already in the record, so it drops this copy.`, D.drop, { nodes: nodeMarks({ [n]: 'dropped' }), links: { ...reached } }, [], { v, n })
+        push(`${n} is already in the record, so it drops this copy.`, D.drop, { nodes: nodeMarks({ [n]: 'dropped' }), links: { ...reached } }, copy, { v, n })
         why(WHY.inRecord(n))
         continue
       }
@@ -177,7 +178,7 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
           `${n} has already seen request ${id}, so it drops this copy.`,
           D.drop,
           { nodes: nodeMarks({ [n]: 'dropped' }), links: { ...reached } },
-          [],
+          copy,
           { v, n },
         )
         why(WHY.duplicate(n))
@@ -192,7 +193,7 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
           `${n} adds itself: the record is now ${listIds(recordN)}.`,
           D.first,
           { nodes: nodeMarks({ [n]: 'new' }), links: { ...reached, [key]: 'new' } },
-          [],
+          copy,
           { v, n, record_n: pyList(recordN) },
         )
         why(WHY.addSelf(dst))
@@ -202,7 +203,7 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
           `${n} hears the RREQ first from ${v}, so it records ${v} as its way back to ${src}.`,
           D.first,
           { nodes: nodeMarks({ [n]: 'new' }), links: { ...reached, [key]: 'new' } },
-          [],
+          copy,
           { v, n },
         )
         why(WHY.reversePath(n, src, dst))
@@ -250,15 +251,18 @@ export function runDiscover(state: ReactiveState, input: unknown): Result {
       { route: pyList(route) },
     )
     why(candidates.length > 1 ? WHY.pickFirst(dst) : WHY.pickOnly(dst))
-    work.control += route.length - 1
-    push(
-      `The RREP carries ${listIds(route)} back to ${src}.`,
-      L.discover.dsr.rrep,
-      { links: pathLinks, path: route },
-      [{ kind: 'RREP', from: dst, to: route[route.length - 2] }],
-      { route: pyList(route) },
-    )
-    why(WHY.rrepDsr(src, dst))
+    for (let i = route.length - 1; i > 0; i--) {
+      const [w, prev] = [route[i], route[i - 1]]
+      work.control += 1
+      push(
+        prev === src ? `The RREP reaches ${src} from ${w}, carrying ${listIds(route)}.` : `The RREP goes from ${w} to ${prev}, carrying ${listIds(route)}.`,
+        L.discover.dsr.rrep,
+        { nodes: { [prev]: 'current' }, links: pathLinks, path: route },
+        [{ kind: 'RREP', from: w, to: prev }],
+        { route: pyList(route) },
+      )
+      why(w === dst ? WHY.rrepDsr(src, dst) : WHY.rrepDsrHop(w))
+    }
     work.cache = { ...work.cache, [src]: { ...(work.cache[src] ?? {}), [dst]: route } }
     push(`${src} stores ${listIds(route)} in its route cache.`, L.discover.dsr.cache, { links: pathLinks, path: route }, [], { route: pyList(route) })
     why(WHY.cache(src))
@@ -374,40 +378,47 @@ export function runBreakLink(state: ReactiveState, input: unknown): Result {
   const { src, dst } = flow
   const up = route[at]
   const down = route[at + 1]
-  // Upstream: the RERR travels from the break back to the source; each node it passes drops the route.
-  work.control += at === 0 ? 0 : at
+  // Upstream: the RERR travels from the break back to the source, one hop per step; each AODV node it reaches drops the route.
+  const dsr = work.protocol === 'dsr'
+  const dropRoute = (n: string) => {
+    push(`${n} deletes its route to ${dst}, which used ${u}-${v}.`, B.remove, { nodes: { [n]: 'dropped' }, links: { [key]: 'dropped' } }, [], { node: n })
+    why(WHY.deleteAodv(n))
+    const table = { ...(work.route[n] ?? {}) }
+    delete table[dst]
+    work.route = { ...work.route, [n]: table }
+  }
   push(
     at === 0 ? `${up} is the source itself, so no RERR has to travel on its side.` : `${up} sends an RERR toward ${src}.`,
     B.rerr,
     { nodes: { [up]: 'current' }, links: { [key]: 'dropped' } },
-    at === 0 ? [] : [{ kind: 'RERR', from: up, to: route[at - 1] }],
-    { end: up },
+    [],
+    { end: up, node: up },
   )
   why(at === 0 ? WHY.rerrAtSource(src) : WHY.rerrUp(src))
-  if (work.protocol === 'dsr') {
+  if (!dsr) dropRoute(up)
+  for (let i = at - 1; i >= 0; i--) {
+    const [from, n] = [route[i + 1], route[i]]
+    work.control += 1
+    push(`The RERR goes from ${from} to ${n}.`, B.rerr, { nodes: { [n]: 'current' }, links: { [key]: 'dropped' } }, [{ kind: 'RERR', from, to: n }], {
+      end: up,
+      node: n,
+    })
+    why(dsr && n !== src ? WHY.rerrPass(n, src) : WHY.rerrHop(n))
+    if (!dsr) dropRoute(n)
+  }
+  if (dsr) {
     push(`${src} deletes the cached route ${listIds(route)}.`, B.remove, { nodes: { [src]: 'dropped' }, links: { [key]: 'dropped' } }, [], { node: src })
     why(WHY.deleteDsr(src))
     const cache = { ...(work.cache[src] ?? {}) }
     delete cache[dst]
     work.cache = { ...work.cache, [src]: cache }
-  } else {
-    for (let i = at; i >= 0; i--) {
-      const n = route[i]
-      push(`${n} deletes its route to ${dst}, which used ${u}-${v}.`, B.remove, { nodes: { [n]: 'dropped' }, links: { [key]: 'dropped' } }, [], {
-        node: n,
-      })
-      why(WHY.deleteAodv(n))
-      const table = { ...(work.route[n] ?? {}) }
-      delete table[dst]
-      work.route = { ...work.route, [n]: table }
-    }
   }
   work.control += 1
   push(
     `${down} also sends an RERR, since it sits at the other end of ${u}-${v}.`,
     B.rerr,
     { nodes: { [down]: 'current' }, links: { [key]: 'dropped' } },
-    [],
+    [{ kind: 'RERR', from: down, to: '*' }],
     { end: down },
   )
   why(WHY.rerrDown(down))

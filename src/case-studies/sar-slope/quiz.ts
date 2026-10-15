@@ -98,7 +98,7 @@ export const sarQuiz: QuizQuestion[] = [
     operationId: 'discover-mpr',
     variant: 'mpr',
     input: 'T1',
-    stepIndex: 7,
+    stepIndex: 8,
     expect: 'is not an MPR of T1',
   },
   {

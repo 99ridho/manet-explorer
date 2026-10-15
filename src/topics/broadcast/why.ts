@@ -9,6 +9,8 @@ export const WHY = {
   noMpr: () => 'With no node two hops away, a relay would only repeat what everyone already heard.',
   unique: (u: string, c: string, n: string) =>
     `${n} is the only neighbor that reaches ${c}. Without ${n} as a relay, ${c} would never get ${u}'s broadcasts.`,
+  manyWays: (c: string) => `${c} has more than one way in, so no single neighbor is required for it yet.`,
+  alreadyMpr: (c: string, n: string) => `${n} is already a relay, so it reaches ${c} without adding another MPR.`,
   covered: () => 'Two-hop neighbors that these MPRs already reach need no other relay.',
   noneFixed: () => 'Every two-hop neighbor has more than one way in, so the choice is still open.',
   greedy: () => 'Taking the neighbor that covers the most uncovered nodes keeps the relay set small.',
@@ -17,9 +19,11 @@ export const WHY = {
   needSource: () => 'A broadcast starts at one node, the source.',
   silent: (v: string, heardFrom: string) =>
     `${heardFrom} did not choose ${v} as a relay, because its MPRs already reach the nodes two hops away. A repeat from ${v} would mostly make duplicates.`,
+  relays: (v: string, heardFrom: string) =>
+    `${heardFrom} picked ${v} as one of its relays, so ${v} has to repeat the packet for the nodes two hops from ${heardFrom}.`,
   source: (v: string) => `${v} is the source, so it transmits first.`,
   relayFlood: (v: string) => `${v} repeats the packet once, as every node does in blind flooding, so the packet spreads without any planning.`,
-  relayMpr: (v: string) => `${v} was chosen as an MPR by the node it heard the packet from, so it repeats the packet once.`,
+  relayMpr: (v: string) => `${v} repeats the packet once. A relay never repeats the same packet twice.`,
   noNeighbor: (v: string) => `A transmission only reaches nodes in range, and ${v} has none.`,
   dup: (n: string) => `${n} has heard this packet before. On a shared channel each extra copy costs airtime and can collide with other packets.`,
   first: (n: string) => `${n} keeps this first copy and remembers it, so it can recognize later copies as duplicates.`,

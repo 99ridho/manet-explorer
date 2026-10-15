@@ -5,6 +5,7 @@ export const WHY = {
   arrive: (u: string) => `${u}'s radio reaches only the volunteers close by, so it can only ask those for an address.`,
   skip: (n: string) => `${n} holds only its own address, so it has nothing to give away. The next neighbor may have spare addresses.`,
   wait: (u: string) => `Every neighbor of ${u} has given its spare addresses away. The space is used unevenly, Buddy's known weakness (Misra pp. 338-339).`,
+  ask: (n: string) => `${n} still holds more than its own address, so it can hand half of its spare range to the newcomer.`,
   split: (via: string) => `With no DHCP server, the radios share out the addresses themselves. ${via} gives away half of its biggest range.`,
   hand: (via: string) => `${via} keeps the half that contains its own address, so its address stays valid.`,
   address: (u: string) => `A range has only one holder, so nobody else uses the first address of ${u}'s range. No other radio has to be asked.`,
@@ -15,10 +16,14 @@ export const WHY = {
   headAlone: (v: string) => `Every neighbor of ${v} already belongs to a cluster, so ${v} leads a cluster of one.`,
   member: (n: string, v: string) => `${n} is one hop from head ${v}, so ${v} can reach it directly and coordinate it.`,
   gateway: (n: string) => `${n} hears two cluster heads, so it can carry messages between their clusters.`,
+  noLongerGateway: (n: string) => `A gateway links two clusters, and ${n} now hears only one head, so it has nothing to bridge.`,
+  cleared: () => 'A fresh election ignores the old clusters, so every radio starts without a head.',
   elected: () => 'Only cluster heads and gateways relay between clusters. Ordinary members talk to their own head.',
   ticks: () => 'A tick is one step of the day. Up to 30 keeps the run short enough to step through.',
   calm: () => 'The volunteers moved, but each member is still in range of its head, so no cluster has to change.',
   changes: () =>
     'Some volunteers walked out of their head\'s range. Each one joins a head it can still hear, or leads a new cluster if it hears none.',
+  rejoin: (v: string) => `${v} walked out of its head's range but still hears another head, so it joins that cluster. The best-ranked head wins.`,
+  becomes: (v: string) => `${v} hears no head at all, so no cluster can take it in and it leads its own. That counts as a new election.`,
   done: () => 'Every new head means a reorganized cluster. Fewer new heads means the clusters stayed stable.',
 }

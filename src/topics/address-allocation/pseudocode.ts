@@ -52,6 +52,6 @@ export const L = {
   joinBuddy: { def: 1, full: 3, split: 4, hand: 6, address: 8 },
   leaveBuddy: { def: 1, buddy: 2, hand: 3, remove: 4 },
   crash: { def: 1, remove: 2, leak: 3 },
-  joinQdad: { def: 1, pick: 2, flood: 5, owner: 8, repick: 9, silence: 12, take: 13 },
+  joinQdad: { def: 1, pick: 2, flood: 5, found: 6, owner: 8, repick: 9, silence: 12, take: 13 },
   merge: { def: 1, link: 2, done: 3, conflict: 4, rejoin: 7 },
 } as const

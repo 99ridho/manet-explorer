@@ -111,7 +111,7 @@ function advertise(work: DsdvSnapshot, push: Push, why: Why, u: string, line: nu
     vars({}),
   )
   why(full ? WHY.sendFull(u) : WHY.sendChanged(u))
-  const changed = receive(work, push, why, u, nbrs, rows, line, outer)
+  const changed = receive(work, push, why, u, nbrs, rows, line, outer, true)
   for (const r of work.tables[u]) r.changed = false
   work.shown = u
   push(`${u} sent ${plural(rows.length, 'row')} to ${plural(nbrs.length, 'neighbor')}.`, at(A.done), undefined, [], vars({}))
@@ -129,12 +129,21 @@ function receive(
   rows: DsdvRow[],
   line: number | null,
   outer: Vars,
+  broadcast = false, // the update went to every neighbor at once, so each receiver gets its own step
 ): string[] {
   const A = L.advertise
   const at = (l: number) => line ?? l
   const vars = (own: Vars) => (line === null ? own : outer)
   const changed: string[] = []
   for (const n of receivers) {
+    if (broadcast) {
+      work.shown = n
+      push(`${n} receives ${u}'s update with ${plural(rows.length, 'row')}.`, at(A.receive), {
+        nodes: { [n]: 'current', [u]: 'visited' },
+        links: { [linkKey(u, n)]: 'active' },
+      }, [{ kind: 'UPDATE', from: u, to: n, label: plural(rows.length, 'row') }], vars({ n }))
+      why(WHY.receive(n, u))
+    }
     for (const r of rows) {
       const old = rowOf(work, n, r.dest)
       const m = r.metric + 1
@@ -161,7 +170,7 @@ function receive(
         )
         why(WHY.fewer(n))
       } else {
-        push(`${n} keeps its route to ${r.dest} via ${old.next}.`, at(A.keep), undefined, [], own)
+        push(`${n} keeps its route to ${r.dest} via ${old.next}.`, at(A.keep), { nodes: { [n]: 'visited', [u]: 'current' } }, [], own)
         why(WHY.keep(n, u, r.dest))
         continue
       }
@@ -223,11 +232,14 @@ export function runMove(state: DsdvState, input: unknown): Result {
     const nbrs = neighbors(work, v)
     const stale = work.tables[v].filter((r) => r.dest !== v && !nbrs.includes(r.next))
     if (stale.length === 0) continue
-    const gone = [...new Set(stale.map((r) => r.next))]
-    work.tables[v] = work.tables[v].filter((r) => !stale.includes(r))
     work.shown = v
-    push(`${v} deletes ${plural(stale.length, 'route')} that went through ${listIds(gone)}.`, M.stale, { nodes: { [v]: 'current' } }, [], { v })
-    why(WHY.stale(v))
+    for (const r of stale) {
+      work.tables[v] = work.tables[v].filter((x) => x !== r)
+      push(`${v} deletes its route to ${r.dest}: next hop ${r.next} is no longer a neighbor.`, M.stale, { nodes: { [v]: 'current', [r.next]: 'dropped' } }, [], {
+        v,
+      })
+      why(WHY.stale(v))
+    }
   }
 
   work.seqOf[u] += 1
@@ -254,7 +266,13 @@ export function runMove(state: DsdvState, input: unknown): Result {
     const v = queue.shift()!
     sent += 1
     const changed = advertise(work, push, why, v, M.advertise, { v })
-    for (const n of changed) if (!queue.includes(n)) queue.push(n)
+    for (const n of changed) {
+      if (queue.includes(n)) continue
+      queue.push(n)
+      work.shown = n
+      push(`${n}'s table changed, so ${n} advertises next.`, M.queue, { nodes: { [n]: 'new' } }, [], { v, n })
+      why(WHY.queued(n))
+    }
   }
   push(`No table changed in the last round, so the update stops after ${plural(sent, 'advertisement')}.`, M.loop)
   why(WHY.settled())

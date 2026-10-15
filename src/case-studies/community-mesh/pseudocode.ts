@@ -37,6 +37,6 @@ export const meshPseudocode: Record<string, string[]> = {
 export const L = {
   route: { def: 1, flood: 2, hop: 4, etx: 5 },
   join: { def: 1, add: 2, advertise: 3 },
-  deliver: { def: 1, drop: 6, lost: 9, watch: 12, delivered: 13, done: 14 },
+  deliver: { def: 1, drop: 6, send: 8, lost: 9, watch: 12, delivered: 13, done: 14 },
   metrics: ML,
 } as const

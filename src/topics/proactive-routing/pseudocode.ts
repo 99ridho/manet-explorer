@@ -32,6 +32,6 @@ export const proactivePseudocode: Record<string, string[]> = {
 
 /** Line numbers the operations highlight, per listing. */
 export const L = {
-  advertise: { def: 1, send: 2, newer: 7, fewer: 9, keep: 11, done: 12 },
-  move: { def: 1, move: 2, stale: 4, seq: 5, full: 7, loop: 9, advertise: 11 },
+  advertise: { def: 1, send: 2, receive: 3, newer: 7, fewer: 9, keep: 11, done: 12 },
+  move: { def: 1, move: 2, stale: 4, seq: 5, full: 7, loop: 9, advertise: 11, queue: 12 },
 } as const

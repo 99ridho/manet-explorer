@@ -59,6 +59,7 @@ interface MprTrace {
   n1: string[]
   n2: string[]
   unique: { c: string; n: string }[] // line 8, one per MPR it fixes
+  checks: { c: string; via: string[]; fixes: boolean }[] // line 7, every two-hop neighbor in order
   coveredAfterUnique: string[]
   greedy: { n: string; k: number }[] // line 12
   mpr: string[] // node order
@@ -73,9 +74,12 @@ export function selectMpr(s: Pick<NetSnapshot, 'nodes' | 'links'>, u: string): M
     .filter((id) => id !== u && !n1.includes(id) && n1.some((m) => adj.get(m)!.has(id)))
   const mpr = new Set<string>()
   const unique: MprTrace['unique'] = []
+  const checks: MprTrace['checks'] = []
   for (const c of n2) {
     const via = n1.filter((m) => adj.get(m)!.has(c))
-    if (via.length === 1 && !mpr.has(via[0])) {
+    const fixes = via.length === 1 && !mpr.has(via[0])
+    checks.push({ c, via, fixes })
+    if (fixes) {
       mpr.add(via[0])
       unique.push({ c, n: via[0] })
     }
@@ -104,7 +108,7 @@ export function selectMpr(s: Pick<NetSnapshot, 'nodes' | 'links'>, u: string): M
     greedy.push({ n: best, k: bestK })
     for (const c of coveredBy([best])) covered.add(c)
   }
-  return { n1, n2, unique, coveredAfterUnique, greedy, mpr: n1.filter((m) => mpr.has(m)) }
+  return { n1, n2, unique, checks, coveredAfterUnique, greedy, mpr: n1.filter((m) => mpr.has(m)) }
 }
 
 function allMpr(s: Pick<NetSnapshot, 'nodes' | 'links'>): Record<string, string[]> {
@@ -148,7 +152,19 @@ export function runSelectMpr(state: BroadcastState, input: unknown): Result {
   })
   why(WHY.sets(u))
   const chosen: string[] = []
-  for (const { c, n } of t.unique) {
+  for (const { c, via, fixes } of t.checks) {
+    if (!fixes) {
+      push(
+        via.length === 1 ? `${c} is reachable only through ${via[0]}, already an MPR.` : `${c} is reachable through ${listIds(via)}, so it fixes no MPR.`,
+        S.check,
+        { nodes: { ...marks(t.n2, 'visited'), ...marks(via, 'visited'), [c]: 'current', ...marks(chosen, 'found') } },
+        [],
+        { c, via: pySet(via) },
+      )
+      why(via.length === 1 ? WHY.alreadyMpr(c, via[0]) : WHY.manyWays(c))
+      continue
+    }
+    const n = via[0]
     chosen.push(n)
     push(
       `${c} is reachable only through ${n}, so ${n} becomes an MPR.`,
@@ -211,7 +227,13 @@ export function runBroadcast(state: BroadcastState, input: unknown): Result {
   const queue: [string, string | null][] = [[src, null]]
   while (queue.length) {
     const [v, heardFrom] = queue.shift()!
-    if (heardFrom && mprRelay && !work.mpr[heardFrom]?.includes(v)) {
+    if (heardFrom && mprRelay && work.mpr[heardFrom]?.includes(v)) {
+      push(`${v} is an MPR of ${heardFrom}, so it relays.`, B.relays, { nodes: { ...got, [v]: 'current' }, links: { ...tree } }, [], {
+        v,
+        heard_from: heardFrom,
+      })
+      why(WHY.relays(v, heardFrom))
+    } else if (heardFrom && mprRelay) {
       push(`${v} is not an MPR of ${heardFrom}, so it does not relay.`, B.silent, { nodes: { ...got }, links: { ...tree } }, [], {
         v,
         heard_from: heardFrom,
@@ -232,7 +254,7 @@ export function runBroadcast(state: BroadcastState, input: unknown): Result {
     for (const n of nbrs) {
       if (seen.has(n)) {
         work.dups += 1
-        push(`${n} already has the packet, so this copy is a duplicate.`, B.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...tree } }, [], { v, n })
+        push(`${n} already has the packet, so this copy is a duplicate.`, B.dup, { nodes: { ...got, [n]: 'dropped' }, links: { ...tree } }, [{ kind: 'PKT', from: v, to: n }], { v, n })
         why(WHY.dup(n))
         continue
       }
@@ -242,7 +264,7 @@ export function runBroadcast(state: BroadcastState, input: unknown): Result {
       push(`${n} receives the packet for the first time.`, B.first, {
         nodes: { ...got, [n]: 'new' },
         links: { ...tree, [linkKey(v, n)]: 'new' },
-      }, [], { v, n })
+      }, [{ kind: 'PKT', from: v, to: n }], { v, n })
       why(WHY.first(n))
       got[n] = 'visited'
       queue.push([n, v])
