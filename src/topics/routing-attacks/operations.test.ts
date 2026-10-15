@@ -10,14 +10,29 @@ describe('discover route', () => {
   it('black hole: the fake RREP S, M, D arrives first and S uses it', () => {
     const { steps, finalSnapshot } = runDiscover(seedNetwork('blackhole'))
     expect(lines(steps)).toEqual([
-      [4, 'Tick 1: A, M hear the RREQ.'],
-      [7, 'M answers at once, claiming a route S, M, D it does not have.'],
-      [4, 'Tick 2: B hears the RREQ.'],
-      [13, 'An RREP with S, M, D reaches S at tick 2.'],
-      [4, 'Tick 3: D hears the RREQ.'],
-      [11, 'D receives the record S, A, B, D and answers.'],
-      [13, 'An RREP with S, A, B, D reaches S at tick 6.'],
-      [14, 'S uses the first route to arrive: S, M, D.'],
+      [14, 'Tick 1: S broadcasts the RREQ with the record S.'],
+      [22, 'A hears its first copy from S and adds itself: S, A.'],
+      [22, 'M hears its first copy from S and adds itself: S, M.'],
+      [24, 'M answers at once, claiming a route S, M, D it does not have.'],
+      [9, 'An RREP with S, M, D reaches S at tick 2.'],
+      [14, 'Tick 2: A broadcasts the RREQ with the record S, A.'],
+      [17, 'S already has this RREQ, so it drops the copy from A.'],
+      [22, 'B hears its first copy from A and adds itself: S, A, B.'],
+      [13, 'M heard the RREQ but passes nothing on.'],
+      [14, 'Tick 3: B broadcasts the RREQ with the record S, A, B.'],
+      [17, 'A already has this RREQ, so it drops the copy from B.'],
+      [20, 'D receives the record S, A, B, D and answers.'],
+      [6, 'Tick 4: the RREP with S, A, B, D moves from D to B.'],
+      [6, 'Tick 5: the RREP with S, A, B, D moves from B to A.'],
+      [9, 'An RREP with S, A, B, D reaches S at tick 6.'],
+      [28, 'S uses the first route to arrive: S, M, D.'],
+    ])
+    // Every RREP hop draws the RREP on the link it crosses.
+    expect(steps.filter((s) => s.highlightLine === 6 || s.highlightLine === 9).map((s) => s.snapshot.packets)).toEqual([
+      [{ kind: 'RREP', from: 'M', to: 'S' }],
+      [{ kind: 'RREP', from: 'D', to: 'B' }],
+      [{ kind: 'RREP', from: 'B', to: 'A' }],
+      [{ kind: 'RREP', from: 'A', to: 'S' }],
     ])
     expect(finalSnapshot.routes).toEqual([
       ['S', 'M', 'D'],
@@ -27,10 +42,15 @@ describe('discover route', () => {
 
   it('wormhole: D first hears S, M1, M2, D and S uses it', () => {
     const { steps, finalSnapshot } = runDiscover(seedNetwork('wormhole'))
+    expect(steps).toHaveLength(25)
+    expect(steps.filter((s) => s.highlightLine === 9).map((s) => s.description)).toEqual([
+      'An RREP with S, M1, M2, D reaches S at tick 5.',
+      'An RREP with S, A, B, C, D reaches S at tick 8.',
+    ])
     expect(steps).toContainEqual(
-      expect.objectContaining({ highlightLine: 9, description: 'M1 passes the RREQ through the tunnel, and M2 replays it next to D.' }),
+      expect.objectContaining({ highlightLine: 27, description: 'M1 passes the RREQ through the tunnel, and M2 replays it next to D.' }),
     )
-    expect(steps.find((s) => s.highlightLine === 11)?.description).toBe('D receives the record S, M1, M2, D and answers.')
+    expect(steps.find((s) => s.highlightLine === 20)?.description).toBe('D receives the record S, M1, M2, D and answers.')
     expect(finalSnapshot.route).toEqual(['S', 'M1', 'M2', 'D'])
     expect(finalSnapshot.routes[1]).toEqual(['S', 'A', 'B', 'C', 'D'])
   })
@@ -42,21 +62,28 @@ describe('discover route', () => {
 
 describe('send packets', () => {
   it('the black hole drops everything', () => {
-    const { steps, finalSnapshot } = runSend(discovered('blackhole'), 3)
+    const { steps, finalSnapshot } = runSend(discovered('blackhole'), 2)
     expect(lines(steps)).toEqual([
+      [8, 'S sends packet 1 to M.'],
       [6, 'M drops packet 1 without a trace.'],
+      [9, 'Packet 1 never reaches D.'],
+      [8, 'S sends packet 2 to M.'],
       [6, 'M drops packet 2 without a trace.'],
-      [6, 'M drops packet 3 without a trace.'],
+      [9, 'Packet 2 never reaches D.'],
     ])
-    expect(finalSnapshot).toMatchObject({ sent: 3, delivered: 0, dropped: 3 })
+    expect(finalSnapshot).toMatchObject({ sent: 2, delivered: 0, dropped: 2 })
   })
 
   it('the wormhole delivers every packet while tunneling all of them', () => {
     const { steps, finalSnapshot } = runSend(discovered('wormhole'), 2)
     expect(lines(steps)).toEqual([
+      [8, 'S sends packet 1 to M1.'],
       [8, 'Packet 1 crosses the tunnel from M1 to M2.'],
+      [8, 'M2 sends packet 1 to D.'],
       [9, 'Packet 1 reaches D.'],
+      [8, 'S sends packet 2 to M1.'],
       [8, 'Packet 2 crosses the tunnel from M1 to M2.'],
+      [8, 'M2 sends packet 2 to D.'],
       [9, 'Packet 2 reaches D.'],
     ])
     expect(finalSnapshot).toMatchObject({ delivered: 2, tunneled: 2 })
@@ -77,6 +104,11 @@ describe('send with watchdog', () => {
       'S never hears M forward packet 3: 3 failures for M.',
       'S never hears M forward packet 4: 4 failures for M.',
     ])
+    expect(steps.filter((s) => s.highlightLine === 8).map((s) => s.description)).toEqual([
+      'M has 1 failure, not past the threshold of 3, so S does not report it yet.',
+      'M has 2 failures, not past the threshold of 3, so S does not report it yet.',
+      'M has 3 failures, not past the threshold of 3, so S does not report it yet.',
+    ])
     const report = steps.findIndex((s) => s.highlightLine === 9)
     expect(steps[report].description).toBe('M passed the threshold of 3, so S reports it.')
     expect(steps[report + 1]).toMatchObject({ highlightLine: 10, description: 'The pathrater avoids M: S switches to S, A, B, D.' })
@@ -87,7 +119,14 @@ describe('send with watchdog', () => {
   it('wormhole: every packet is passed on, so nobody is flagged', () => {
     const { steps, finalSnapshot } = runWatchdog(discovered('wormhole'), 5)
     expect(steps.some((s) => s.highlightLine === 7)).toBe(false)
-    expect(steps[0]).toMatchObject({ highlightLine: 5, description: 'S hears M1 forward packet 1.' })
+    expect(lines(steps.slice(0, 6))).toEqual([
+      [4, 'S sends packet 1 to M1 and listens.'],
+      [5, 'S hears M1 forward packet 1.'],
+      [4, 'Packet 1 crosses the tunnel from M1 to M2.'],
+      [5, 'M1 hears M2 forward packet 1.'],
+      [4, 'M2 sends packet 1 to D and listens.'],
+      [5, 'Packet 1 reaches D.'],
+    ])
     expect(finalSnapshot).toMatchObject({ delivered: 5, flagged: [], tunneled: 5, route: ['S', 'M1', 'M2', 'D'] })
   })
 })

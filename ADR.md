@@ -123,3 +123,12 @@ Moving nodes in Mobility, Relief Camp, and SAR Slope can still meet, and their p
 - Status: Accepted
 
 Students could see which line ran but not the values it ran with, so the Code panel now shows, in its own card between the Why box and the listing, the call the highlighted line runs inside (`elect(net, rank=highest)`) and chips for the listing's variables at that line (`v = 9`, `n = 2`). The call line is derived, not stored: `callLine()` in `src/lib/call-line.ts` finds the def that encloses the line by indentation, so helper defs such as `dfs` and `relays` get their own call, and fills each parameter from `Step.variables`. `Step` and `TopicModule` keep their §7 shape. `recorder(work, args)` carries a run's arguments on every step, and each `push` adds the locals. A missing or invalid input binds `None`. Every variable name must appear in its listing, except the measures the SPEC names (`header`, `pdr`, `delay`, `overhead`), and every parameter except `net` must be bound; `src/topics/pseudocode.test.ts` checks both. Chips that repeated a live field (`rreqTx`, `tx`, `dups`, `dupes`) and multihop's `margin`, which no listing names, were dropped. When one listing's steps run inside another listing's line (Clustering's leave calling elect, Address Allocation's merge calling a join, DSDV's move calling advertise, Community Mesh's flood), the step carries the outer listing's names only.
+
+## ADR-018: One event per step
+
+- Date: 2026-10-15
+- Status: Accepted
+
+Stepping skipped events: Week 8's Discover route showed one step per tick, dropped duplicates without a step, and showed an RREP reaching the source three ticks after it left the destination with no hop in between. Every operation now steps one event at a time. An event is one transmission or one hop of a message, one node's decision about a copy it received, or one node changing its role, its table, or its battery. A step that says a message moved draws that message on the link it crossed, and a step for a copy a neighbor received draws that copy. No tick passes without a step. The tick models, seed results, transmission counts, and metrics numbers stay the same; only the step lists are finer.
+
+Four kinds of step stay as they were, because each already is one event or a summary the SPEC asks for: a metrics run (§9.1, one step per flow per design), a mobility tick (every node moves at once), geographic routing's planarization (a precompute before the walk), and the density count in Mobility (a statistic over many ticks).

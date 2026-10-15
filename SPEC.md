@@ -1271,31 +1271,51 @@ Discovery is DSR-style (Section 10.3), because Week 8 says the watchdog suits so
 
 ```python
 1  def discover(net, src, dst):
-2      heard = [(src, [src])]
-3      while heard:
-4          heard = flood_tick(heard)  # each node forwards its first copy and adds itself to the record
-5          for n, record in heard:
-6              if n.black_hole:
-7                  n.send(RREP(record + [dst]), to=src)  # a route n does not have
-8              if n.tunnel_end:
-9                  heard.append((n.far_end, record + [n.far_end]))  # replayed in the same tick
-10             if n == dst:
-11                 send_along(reversed(record), RREP(record))
-12         for route in src.rreps_arrived():
-13             src.routes.append(route)  # every route is kept, in order of arrival
-14     return src.routes[0]  # the first RREP to arrive wins
+2      heard, replies = [(src, [src])], []
+3      src.seen = True
+4      while heard or replies:
+5          for rrep in list(replies):
+6              rrep.hop()  # one hop toward src per tick
+7              if rrep.at == src:
+8                  replies.remove(rrep)
+9                  src.routes.append(rrep.route)  # every route is kept, in order of arrival
+10         sending, heard = heard, []
+11         for v, record in sending:
+12             if v.black_hole:
+13                 continue  # a black hole never passes the RREQ on
+14             v.broadcast(RREQ(record))
+15             for n in v.neighbors():
+16                 if n != dst and n.seen:
+17                     continue  # drop the duplicate copy
+18                 n.seen = True
+19                 if n == dst:
+20                     replies.append(RREP(record + [dst]))  # dst answers every copy
+21                     continue
+22                 heard.append((n, record + [n]))
+23                 if n.black_hole:
+24                     replies.append(RREP(record + [n, dst]))  # a route n does not have
+25                 if n.tunnel_end and not n.far_end.seen:
+26                     n.far_end.seen = True
+27                     heard.append((n.far_end, record + [n, n.far_end]))  # replayed in the same tick
+28     return src.routes[0]  # the first RREP to arrive wins
 ```
 
-`heard` holds the nodes that first hear the RREQ in this tick, each with the record that reached it.
+One pass of the `while` loop is one tick. `heard` holds the nodes that first heard the RREQ in the last tick, each with the record that reached it, and `replies` holds the RREPs on their way back. An RREP moves one hop per tick, starting in the tick after it was sent, so a route that looks shorter answers sooner. Every event is a step of its own (ADR-018): each broadcast, each copy a neighbor receives, each answer, and each hop of each RREP.
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
-| Per tick | 4 | "Tick `{t}`: `{nodes}` hear the RREQ." | new nodes current |
-| Black hole | 7 | "`{n}` answers at once, claiming a route `{route}` it does not have." | `{n}` flagged |
-| Tunnel | 9 | "`{n}` passes the RREQ through the tunnel, and `{m}` replays it next to `{far}`." | tunnel active |
-| Destination | 11 | "`{dst}` receives the record `{record}` and answers." | `{dst}` found |
-| Per RREP arrival | 13 | "An RREP with `{route}` reaches `{src}` at tick `{t}`." | packet |
-| Pick | 14 | "`{src}` uses the first route to arrive: `{route}`." | path tree |
+| RREP hop | 6 | "Tick `{t}`: the RREP with `{route}` moves from `{w}` to `{prev}`." | packet, `{prev}` current |
+| RREP arrival | 9 | "An RREP with `{route}` reaches `{src}` at tick `{t}`." | packet, `{src}` current |
+| Black hole stays silent | 13 | "`{v}` heard the RREQ but passes nothing on." | `{v}` flagged |
+| Broadcast | 14 | "Tick `{t}`: `{v}` broadcasts the RREQ with the record `{record}`." | packets to every neighbor, `{v}` current |
+| Duplicate | 17 | "`{n}` already has this RREQ, so it drops the copy from `{v}`." | packet, `{n}` dropped |
+| Destination | 20 | "`{dst}` receives the record `{record}` and answers." | packet, `{dst}` found |
+| First copy | 22 | "`{n}` hears its first copy from `{v}` and adds itself: `{record}`." | packet, `{n}` new |
+| Black hole | 24 | "`{n}` answers at once, claiming a route `{route}` it does not have." | `{n}` flagged |
+| Tunnel | 27 | "`{n}` passes the RREQ through the tunnel, and `{m}` replays it next to `{far}`." | tunnel active, packet |
+| Pick | 28 | "`{src}` uses the first route to arrive: `{route}`." | path tree |
+
+On the black hole seed the run is 16 steps: S broadcasts; A and M take their first copies; M answers; at tick 2 the fake RREP reaches S, A broadcasts, S drops A's copy, B takes its first copy, and M stays silent; at tick 3 B broadcasts, A drops B's copy, and D answers S, A, B, D; that RREP moves D to B at tick 4, B to A at tick 5, and reaches S at tick 6; then the pick.
 
 Seed results: Black hole, the fake RREP S, M, D arrives first and S uses it; Wormhole, D first hears S, M1, M2, D (3 apparent hops against 4 through A, B, C) and S uses it; No attacker, S uses S, A, B, D.
 
@@ -1313,7 +1333,7 @@ Seed results: Black hole, the fake RREP S, M, D arrives first and S uses it; Wor
 9          net.count(p, delivered)
 ```
 
-Steps per packet: "`{v}` drops packet `{p}` without a trace." (line 6) or "Packet `{p}` reaches `{dst}`." (line 9), with "Packet `{p}` crosses the tunnel from `{m1}` to `{m2}`." (line 8) on the wormhole. Week 8 notes that a tunnel works even when traffic is encrypted, because the attacker relays packets without reading them; the delivered count stays at 100 % while `tunneled` rises, which is the point of the scene.
+Steps per packet, one per hop: "`{v}` sends packet `{p}` to `{nxt}`." (line 8), or "Packet `{p}` crosses the tunnel from `{v}` to `{nxt}`." (line 8) on the tunnel link, or "`{v}` drops packet `{p}` without a trace." (line 6); then the count, "Packet `{p}` reaches `{dst}`." or "Packet `{p}` never reaches `{dst}`." (line 9). Week 8 notes that a tunnel works even when traffic is encrypted, because the attacker relays packets without reading them; the delivered count stays at 100 % while `tunneled` rises, which is the point of the scene.
 
 **Send with watchdog** (`watchdog`, `inputKind: "key"`, placeholder "Packets, from 1 to 20")
 
@@ -1333,11 +1353,14 @@ Steps per packet: "`{v}` drops packet `{p}` without a trace." (line 6) or "Packe
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
-| Heard | 5 | "`{v}` hears `{nxt}` forward packet `{p}`." | link tree |
+| Send | 4 | "`{v}` sends packet `{p}` to `{nxt}` and listens." | packet |
+| Tunnel | 4 | "Packet `{p}` crosses the tunnel from `{v}` to `{nxt}`." | packet, tunnel active |
+| Heard | 5 | "`{v}` hears `{nxt}` forward packet `{p}`." | `{v}` current, `{nxt}`'s next link active |
+| Delivered | 5 | "Packet `{p}` reaches `{dst}`." | `{dst}` found |
 | Silence | 7 | "`{v}` never hears `{nxt}` forward packet `{p}`: `{f}` failures for `{nxt}`." | `{nxt}` flagged |
+| Below the threshold | 8 | "`{nxt}` has `{f}` failures, not past the threshold of 3, so `{v}` does not report it yet." | `{nxt}` flagged |
 | Report | 9 | "`{nxt}` passed the threshold of 3, so `{v}` reports it to `{src}`." | `{nxt}` flagged |
 | Reroute | 10 | "The pathrater avoids `{nxt}`: `{src}` switches to `{route}`." | path tree |
-| Delivered | 5 | "Packet `{p}` reaches `{dst}`." | none |
 
 The threshold of 3 is this demo's; Week 8 says only that a count past a threshold is reported. On the black hole seed with 10 packets: packets 1 to 4 are dropped, M is reported after the fourth, and packets 5 to 10 go S, A, B, D. On the wormhole seed every packet is passed on, so the watchdog has no failure to count and flags nobody, while M1 and M2 still control the route. This demo counts a forward into the tunnel as heard and does not model what a watcher could physically overhear. Week 8 lists collaborative attacks among the watchdog's blind spots (Misra pp. 444-445).
 

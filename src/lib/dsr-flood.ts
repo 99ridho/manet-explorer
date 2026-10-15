@@ -1,6 +1,7 @@
-// SPEC.md §10.11 Discover, shared with §19.3: a DSR-style RREQ flood in ticks. Each node forwards
-// its first copy and adds itself to the record, the destination answers every copy, a black hole
-// answers at once with a route it does not have, and a tunnel end replays the request at its far end.
+// SPEC.md §10.11 Discover, shared with §19.3: a DSR-style RREQ flood in ticks, one event per step
+// (ADR-018). Each node forwards its first copy and adds itself to the record, the destination answers
+// every copy, a black hole answers at once with a route it does not have, and a tunnel end replays the
+// request at its far end. An RREP moves one hop per tick, starting in the tick after it was sent.
 import type { HighlightKind, InFlight, NetHighlight, NetSnapshot } from '@/types/net'
 import { linkKey, listIds, neighbors, pyList } from './net'
 
@@ -12,11 +13,15 @@ export interface FloodRules {
 }
 
 export interface FloodLines {
-  tick: number
+  hop: number
+  arrival: number
+  silent: number
+  broadcast: number
+  duplicate: number
+  dest: number
+  first: number
   blackHole: number
   tunnel: number
-  dest: number
-  arrival: number
 }
 
 /** Every route an RREP brought to `src`, in order of arrival, and the RREQ transmissions it took. */
@@ -33,65 +38,100 @@ export function floodRreq(
   let rreq = 0
   const seen = new Set([src])
   let heard: [string, string[]][] = [[src, [src]]]
-  const pending: { at: number; route: string[] }[] = []
-  for (let t = 1; heard.length || pending.length; t++) {
-    const next: [string, string[]][] = []
-    const copies: string[][] = [] // records that reach the destination this tick
-    for (const [v, record] of heard) {
-      if (v === dst || rules.blackHole(v)) continue
+  // `at` is the index in `route` of the node holding the RREP.
+  let replies: { route: string[]; at: number }[] = []
+  for (let t = 1; heard.length || replies.length; t++) {
+    for (const r of replies) {
+      const [w, prev] = [r.route[r.at], r.route[r.at - 1]]
+      r.at -= 1
+      const packets: InFlight[] = [{ kind: 'RREP', from: w, to: prev }]
+      if (r.at > 0) {
+        push(`Tick ${t}: the RREP with ${listIds(r.route)} moves from ${w} to ${prev}.`, lines.hop, { nodes: { [prev]: 'current' } }, packets, {
+          route: pyList(r.route),
+        })
+        why('The answer travels back along the recorded route, one hop per tick.')
+        continue
+      }
+      routes.push(r.route)
+      push(`An RREP with ${listIds(r.route)} reaches ${src} at tick ${t}.`, lines.arrival, { nodes: { [src]: 'current' } }, packets, {
+        route: pyList(r.route),
+      })
+      why(`${src} keeps every route an answer brings, in order of arrival. A route that looks shorter answers sooner.`)
+    }
+    replies = replies.filter((r) => r.at > 0)
+    const sending = heard
+    heard = []
+    for (const [v, record] of sending) {
+      if (rules.blackHole(v)) {
+        push(`${v} heard the RREQ but passes nothing on.`, lines.silent, { nodes: { [v]: 'flagged' } }, [], { v, record: pyList(record) })
+        why(`${v} already answered with its fake route, so it has no reason to help the request reach ${dst}.`)
+        continue
+      }
       rreq += 1
-      for (const n of neighbors(s, v)) {
-        if (n === dst) copies.push([...record, n])
-        else if (!seen.has(n)) {
-          seen.add(n)
-          next.push([n, [...record, n]])
+      const around = neighbors(s, v)
+      push(
+        `Tick ${t}: ${v} broadcasts the RREQ with the record ${listIds(record)}.`,
+        lines.broadcast,
+        { nodes: { [v]: 'current' } },
+        around.map((n) => ({ kind: 'RREQ', from: v, to: n })),
+        { v, record: pyList(record) },
+      )
+      why(`${v} passes on the first copy it heard, so every neighbor gets a copy at once.`)
+      for (const n of around) {
+        const packets: InFlight[] = [{ kind: 'RREQ', from: v, to: n }]
+        if (n !== dst && seen.has(n)) {
+          push(`${n} already has this RREQ, so it drops the copy from ${v}.`, lines.duplicate, { nodes: { [n]: 'dropped' } }, packets, {
+            v,
+            n,
+            record: pyList(record),
+          })
+          why(`${n} forwarded this request already. Dropping later copies stops the flood from circling back.`)
+          continue
+        }
+        seen.add(n)
+        const recordN = [...record, n]
+        if (n === dst) {
+          replies.push({ route: recordN, at: recordN.length - 1 })
+          push(`${dst} receives the record ${listIds(recordN)} and answers.`, lines.dest, { nodes: { [dst]: 'found' } }, packets, {
+            v,
+            n,
+            record: pyList(record),
+          })
+          why(`Each copy reached ${dst} along a different chain of nodes, and ${dst} answers every one so the source can choose.`)
+          continue
+        }
+        heard.push([n, recordN])
+        push(`${n} hears its first copy from ${v} and adds itself: ${listIds(recordN)}.`, lines.first, { nodes: { [n]: 'new' } }, packets, {
+          v,
+          n,
+          record: pyList(record),
+        })
+        why(`The record lists every node the request crossed, so the answer can come back along the same chain.`)
+        if (rules.blackHole(n)) {
+          const fake = [...recordN, dst]
+          replies.push({ route: fake, at: recordN.length - 1 })
+          push(`${n} answers at once, claiming a route ${listIds(fake)} it does not have.`, lines.blackHole, { nodes: { [n]: 'flagged' } }, [], {
+            v,
+            n,
+            record: pyList(record),
+          })
+          why(`${n} wants to sit on the route, so it answers at once with a short route it does not have. A quick, short answer looks attractive to the source.`)
+        }
+        const far = rules.farEnd(n)
+        if (far && !seen.has(far)) {
+          seen.add(far)
+          heard.push([far, [...recordN, far]])
+          push(
+            `${n} passes the RREQ through the tunnel, and ${far} replays it next to ${listIds(neighbors(s, far))}.`,
+            lines.tunnel,
+            { links: { [linkKey(n, far)]: 'active' as HighlightKind } },
+            [{ kind: 'RREQ', from: n, to: far }],
+            { v, n, record: pyList(record) },
+          )
+          why('The two attackers carry the request over a hidden link, so it reaches the far side sooner and in fewer apparent hops than over the real path.')
         }
       }
     }
-    const ids = [...new Set([...next.map(([n]) => n), ...(copies.length ? [dst] : [])])]
-    if (ids.length) {
-      push(`Tick ${t}: ${listIds(ids)} ${ids.length === 1 ? 'hears' : 'hear'} the RREQ.`, lines.tick, {
-        nodes: Object.fromEntries(ids.map((n) => [n, 'current' as HighlightKind])),
-      })
-      why('Each node passes on the first copy it hears and adds its name to the record, so the request spreads one hop per tick.')
-    }
-    for (const [n, record] of next) {
-      if (rules.blackHole(n)) {
-        const fake = [...record, dst]
-        pending.push({ at: t + record.length - 1, route: fake })
-        push(`${n} answers at once, claiming a route ${listIds(fake)} it does not have.`, lines.blackHole, { nodes: { [n]: 'flagged' } }, [
-          { kind: 'RREP', from: n, to: record[record.length - 2] },
-        ], { n, record: pyList(record) })
-        why(`${n} wants to sit on the route, so it answers at once with a short route it does not have. A quick, short answer looks attractive to the source.`)
-      }
-      const far = rules.farEnd(n)
-      if (far && !seen.has(far)) {
-        seen.add(far)
-        next.push([far, [...record, far]])
-        push(
-          `${n} passes the RREQ through the tunnel, and ${far} replays it next to ${listIds(neighbors(s, far))}.`,
-          lines.tunnel,
-          { links: { [linkKey(n, far)]: 'active' } },
-          [{ kind: 'RREQ', from: n, to: far }],
-          { n, record: pyList(record) },
-        )
-        why('The two attackers carry the request over a hidden link, so it reaches the far side sooner and in fewer apparent hops than over the real path.')
-      }
-    }
-    for (const record of copies) {
-      pending.push({ at: t + record.length - 1, route: record })
-      push(`${dst} receives the record ${listIds(record)} and answers.`, lines.dest, { nodes: { [dst]: 'found' } }, [], { record: pyList(record) })
-      why(`Each copy reached ${dst} along a different chain of nodes, and ${dst} answers every one so the source can choose.`)
-    }
-    for (const r of pending.filter((p) => p.at === t)) {
-      routes.push(r.route)
-      push(`An RREP with ${listIds(r.route)} reaches ${src} at tick ${t}.`, lines.arrival, { nodes: { [src]: 'current' } }, [
-        { kind: 'RREP', from: r.route[1], to: src },
-      ], { route: pyList(r.route) })
-      why('The answer travels back along the recorded route, so a route that looks shorter answers sooner.')
-    }
-    for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at === t) pending.splice(i, 1)
-    heard = next
   }
   return { routes, rreq }
 }

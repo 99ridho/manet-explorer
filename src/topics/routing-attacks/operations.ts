@@ -116,31 +116,39 @@ export function runSend(state: AttackState, input: unknown): Result {
   for (let i = 0; i < k; i++) {
     const p = work.sent + 1
     work.sent = p
-    let delivered = true
+    let lostAt: string | null = null
     for (let h = 0; h + 1 < route.length; h++) {
       const [v, nxt] = [route[h], route[h + 1]]
       if (isBlackHole(work, v)) {
-        delivered = false
+        lostAt = v
         work.dropped += 1
-        push(`${v} drops packet ${p} without a trace.`, S.drop, { nodes: { [v]: 'dropped' }, links: tree(route) }, [], { p, v })
+        push(`${v} drops packet ${p} without a trace.`, S.drop, { nodes: { [v]: 'dropped' }, links: tree(route) }, [], { p, v, nxt, delivered: 'False' })
         why(WHY.drop(v))
         break
       }
+      const packets = [{ kind: 'DATA', from: v, to: nxt, label: `${p}` }]
       if (isTunnel(work, v, nxt)) {
         work.tunneled += 1
-        push(`Packet ${p} crosses the tunnel from ${v} to ${nxt}.`, S.tunnel, { links: { ...tree(route), [linkKey(v, nxt)]: 'active' } }, [
-          { kind: 'DATA', from: v, to: nxt, label: `${p}` },
-        ], { p, v, nxt })
+        push(`Packet ${p} crosses the tunnel from ${v} to ${nxt}.`, S.hop, { links: { ...tree(route), [linkKey(v, nxt)]: 'active' } }, packets, {
+          p,
+          v,
+          nxt,
+          delivered: 'True',
+        })
         why(WHY.tunnel())
+        continue
       }
+      push(`${v} sends packet ${p} to ${nxt}.`, S.hop, { nodes: { [nxt]: 'current' }, links: tree(route) }, packets, { p, v, nxt, delivered: 'True' })
+      why(WHY.hop(nxt))
     }
-    if (delivered) {
-      work.delivered += 1
-      push(`Packet ${p} reaches ${DST}.`, S.done, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [
-        { kind: 'DATA', from: route[route.length - 2], to: DST, label: `${p}` },
-      ], { p, delivered: 'True' })
-      why(WHY.delivered())
+    if (lostAt) {
+      push(`Packet ${p} never reaches ${DST}.`, S.done, { nodes: { [lostAt]: 'dropped' }, links: tree(route) }, [], { p, delivered: 'False' })
+      why(WHY.lost(lostAt))
+      continue
     }
+    work.delivered += 1
+    push(`Packet ${p} reaches ${DST}.`, S.done, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [], { p, delivered: 'True' })
+    why(WHY.delivered())
   }
   return { steps, finalSnapshot: cloneNet(work) }
 }
@@ -166,20 +174,28 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
     work.sent = p
     for (let h = 0; h + 1 < route.length; h++) {
       const [v, nxt] = [route[h], route[h + 1]]
-      if (isTunnel(work, v, nxt)) work.tunneled += 1
+      const packets = [{ kind: 'DATA', from: v, to: nxt, label: `${p}` }]
+      if (isTunnel(work, v, nxt)) {
+        work.tunneled += 1
+        push(`Packet ${p} crosses the tunnel from ${v} to ${nxt}.`, W.send, { links: { ...tree(route), [linkKey(v, nxt)]: 'active' } }, packets, { p, v, nxt })
+        why(WHY.tunnel())
+      } else {
+        push(`${v} sends packet ${p} to ${nxt} and listens.`, W.send, { nodes: { [nxt]: 'current' }, links: tree(route) }, packets, { p, v, nxt })
+        why(WHY.watchSend(v, nxt))
+      }
       if (nxt === DST) {
         work.delivered += 1
-        push(`Packet ${p} reaches ${DST}.`, W.heard, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [
-          { kind: 'DATA', from: v, to: nxt, label: `${p}` },
-        ], { p, v, nxt })
+        push(`Packet ${p} reaches ${DST}.`, W.heard, { nodes: { [DST]: 'found' }, links: tree(route), path: route }, [], { p, v, nxt })
         why(WHY.delivered())
         break
       }
       // This demo counts a forward into the tunnel as heard; a black hole forwards nothing.
       if (!isBlackHole(work, nxt)) {
-        push(`${v} hears ${nxt} forward packet ${p}.`, W.heard, { links: { [linkKey(v, nxt)]: 'tree' } }, [
-          { kind: 'DATA', from: v, to: nxt, label: `${p}` },
-        ], { p, v, nxt })
+        push(`${v} hears ${nxt} forward packet ${p}.`, W.heard, { nodes: { [v]: 'current' }, links: { ...tree(route), [linkKey(nxt, route[h + 2])]: 'active' } }, [], {
+          p,
+          v,
+          nxt,
+        })
         why(WHY.heard(v, nxt))
         continue
       }
@@ -194,7 +210,14 @@ export function runWatchdog(state: AttackState, input: unknown): Result {
         { p, v, nxt },
       )
       why(WHY.silence(v, nxt))
-      if (f > THRESHOLD && !work.flagged.includes(nxt)) {
+      if (f <= THRESHOLD) {
+        push(`${nxt} has ${f} ${f === 1 ? 'failure' : 'failures'}, not past the threshold of ${THRESHOLD}, so ${v} does not report it yet.`, W.threshold, { nodes: { [nxt]: 'flagged' } }, [], {
+          p,
+          v,
+          nxt,
+        })
+        why(WHY.below(nxt))
+      } else {
         work.flagged = [...work.flagged, nxt]
         push(`${nxt} passed the threshold of ${THRESHOLD}, so ${v} reports it${v === SRC ? '' : ` to ${SRC}`}.`, W.report, { nodes: { [nxt]: 'flagged' } }, [], { nxt })
         why(WHY.report(v, nxt))

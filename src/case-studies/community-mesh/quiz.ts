@@ -98,7 +98,7 @@ export const meshQuiz: QuizQuestion[] = [
     operationId: 'route',
     variant: 'etx-watchdog',
     input: null,
-    stepIndex: 9,
+    stepIndex: 22,
     expect: 'has the smallest ETX',
   },
   {
@@ -117,7 +117,7 @@ export const meshQuiz: QuizQuestion[] = [
     operationId: 'route',
     variant: 'hop',
     input: null,
-    stepIndex: 9,
+    stepIndex: 22,
     expect: 'S, X, D has the fewest hops',
   },
 ]

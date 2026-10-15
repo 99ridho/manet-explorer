@@ -88,7 +88,8 @@ export function runFindRoute(state: MeshState): Result {
   work.candidates = []
   work.focus = 'route'
   const { steps, push, why } = recorder(work, { src: SRC, dst: DST, routing: work.routing === 'hop' ? "'hop'" : "'etx'" })
-  const lines = { tick: R.flood, blackHole: R.flood, tunnel: R.flood, dest: R.flood, arrival: R.flood }
+  const F = R.flood
+  const lines = { hop: F, arrival: F, silent: F, broadcast: F, duplicate: F, dest: F, first: F, blackHole: F, tunnel: F }
   // The flood runs inside flood_rreq() here, so its record and route variables stay off the call's line.
   const flat: typeof push = (d, l, h, p) => push(d, l, h, p)
   const { routes, rreq } = floodRreq(work, SRC, DST, { blackHole: (id) => isBlackHole(work, id), farEnd: () => null }, flat, why, lines)

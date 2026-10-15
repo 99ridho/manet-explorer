@@ -9,7 +9,11 @@ export const WHY = {
   drop: (v: string) => `${v} pulled the route toward itself on purpose. It throws the data away, and nothing tells the source the packet was lost.`,
   tunnel: () =>
     'The tunnel delivers the packet, so nothing looks wrong. The attackers still sit on the route and can delay or drop traffic whenever they choose.',
+  hop: (nxt: string) => `The route lists ${nxt} as the next node, so the packet goes there.`,
+  lost: (v: string) => `The packet stopped at ${v}. The source counts it as lost but cannot tell where it went.`,
   delivered: () => 'The packet reached the destination, so it stops here.',
+  watchSend: (v: string, nxt: string) => `${v} keeps a copy of the packet, then listens to check that ${nxt} passes it on.`,
+  below: (nxt: string) => `A few misses can be collisions, so the watchdog waits for more before it accuses ${nxt}.`,
   heard: (v: string, nxt: string) => `${v} listens after handing the packet on. Hearing ${nxt} forward it shows ${nxt} did its job.`,
   silence: (v: string, nxt: string) =>
     `${v} kept a copy and listened, but ${nxt} stayed quiet. One miss can be a collision, so the watchdog only counts it.`,
