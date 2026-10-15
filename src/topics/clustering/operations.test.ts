@@ -56,6 +56,7 @@ describe('node leaves', () => {
       '6 joins cluster head 8, which it can still hear.',
       '4 has no undecided neighbor left, so it becomes a cluster head of its own.',
       '2 has no undecided neighbor left, so it becomes a cluster head of its own.',
+      '6 no longer hears two cluster heads, so it stops being a gateway.',
       'No node is a gateway now.',
     ])
     expect(finalSnapshot.elections).toBe(2)
@@ -65,7 +66,7 @@ describe('node leaves', () => {
 
   it('a member leaving only changes the gateways', () => {
     const { steps, finalSnapshot } = runLeave(elected, '6')
-    expect(descs(steps)).toEqual(['6 leaves the network.', 'No node is a gateway now.'])
+    expect(descs(steps)).toEqual(['6 leaves the network.', '6 was not a cluster head, so no member loses its head.', 'No node is a gateway now.'])
     expect(finalSnapshot.elections).toBe(0)
   })
 

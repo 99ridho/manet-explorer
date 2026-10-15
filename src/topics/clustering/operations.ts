@@ -132,8 +132,21 @@ function computeGateways(s: ClusterSnapshot): string[] {
 }
 
 function gatewaysStep(work: ClusterSnapshot, push: Push, why: Why, line: number) {
+  const before = work.gateways
   work.gateways = computeGateways(work)
   syncRoles(work)
+  for (const n of work.nodes.map((x) => x.id)) {
+    const is = work.gateways.includes(n)
+    if (before.includes(n) === is) continue
+    push(
+      is
+        ? `${n} now hears cluster heads ${listIds(headsInRange(work, n))}, so it becomes a gateway.`
+        : `${n} no longer hears two cluster heads, so it stops being a gateway.`,
+      line,
+      view(work, { [n]: is ? 'new' : 'dropped' }),
+    )
+    why(is ? WHY.gateway(n) : WHY.notGateway(n))
+  }
   push(
     work.gateways.length ? `Gateways are now ${listIds(work.gateways)}.` : 'No node is a gateway now.',
     line,
@@ -199,6 +212,9 @@ export function runLeave(state: ClusterState, input: unknown): Result {
       }
     }
     work.elections += electUndecided(work, push, why, { head: V.elect, member: V.elect }, false)
+  } else {
+    push(`${u} was not a cluster head, so no member loses its head.`, V.notHead, view(work))
+    why(WHY.notHead(u))
   }
   gatewaysStep(work, push, why, V.gateways)
   return { steps, finalSnapshot: cloneNet(work) }

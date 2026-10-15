@@ -43,6 +43,6 @@ export const clusterPseudocode: Record<string, string[]> = {
 /** Line numbers the operations highlight, per listing. */
 export const L = {
   elect: { def: 1, none: 2, head: 5, member: 9, gateway: 13, done: 11 },
-  leave: { def: 1, remove: 2, rejoin: 7, orphan: 9, elect: 10, gateways: 11 },
+  leave: { def: 1, remove: 2, notHead: 3, rejoin: 7, orphan: 9, elect: 10, gateways: 11 },
   join: { def: 1, add: 2, joins: 5, head: 7, gateways: 8 },
 } as const

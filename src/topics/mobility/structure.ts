@@ -60,7 +60,7 @@ export const mobilityStructure: StructureSpec<MobilitySnapshot> = {
     const p = pathAvailability(s)
     return {
       tick: s.tick,
-      links: s.links.length,
+      links: s.links.filter((l) => !l.broken).length,
       changes: s.linkChanges,
       lasts: d === null ? 'none' : d.toFixed(1),
       paths: p === null ? 'none' : `${Math.round(p)}%`,

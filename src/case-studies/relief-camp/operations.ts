@@ -364,18 +364,22 @@ export function runAdvance(state: CampState, input: unknown): Result {
   }
   const start = work.elections
   for (let i = 0; i < ticks; i++) {
+    const before = work.links
     const changes = tickCamp(work)
-    if (changes.length === 0) {
-      work.focus = 'movement'
-      push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and every member still hears its head.`, A.calm, view(work), [], { t: i })
-      why(WHY.calm())
-      continue
-    }
+    const now = new Set(work.links.map((l) => linkKey(l.a, l.b)))
+    const gone = before.filter((l) => !now.has(linkKey(l.a, l.b)))
+    const moved = view(work, {}, Object.fromEntries(gone.map((l) => [linkKey(l.a, l.b), 'dropped' as HighlightKind])))
     work.focus = 'movement'
-    push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and ${plural(changes.length, 'volunteer')} lost their head.`, A.calm, view(work), [], {
-      t: i,
-    })
-    why(WHY.changes())
+    if (changes.length === 0) {
+      push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and every member still hears its head.`, A.calm, moved, [], { t: i })
+      why(WHY.calm())
+    } else {
+      push(`Tick ${work.tick}: ${plural(work.links.length, 'link')}, and ${plural(changes.length, 'volunteer')} lost their head.`, A.calm, moved, [], { t: i })
+      why(WHY.changes())
+    }
+    // A broken link stays on screen for this one step, dashed, so the break can be seen.
+    steps[steps.length - 1].snapshot.links.push(...gone.map((l) => ({ ...l, broken: true })))
+    if (changes.length === 0) continue
     work.focus = 'clusters'
     for (const { v, old, head } of changes) {
       push(

@@ -1,5 +1,5 @@
 // SPEC.md §10.8: random waypoint and RPGM in ticks, where nodes spend their time, and a metrics run.
-import { cloneNet, linkKey, plural, recorder } from '@/lib/net'
+import { cloneNet, linkKey, listIds, plural, recorder } from '@/lib/net'
 import { pushMetricsSteps } from '@/lib/sim/metrics'
 import {
   initMotion,
@@ -16,7 +16,7 @@ import {
 } from '@/lib/sim/mobility'
 import { mulberry32 } from '@/lib/sim/rng'
 import { runFlow, type Flow, type Topology } from '@/lib/sim/run'
-import type { HighlightKind } from '@/types/net'
+import type { HighlightKind, NetLink } from '@/types/net'
 import type { OperationDefinition, OperationResult } from '@/types/step-engine'
 import { L } from './pseudocode'
 import type { MobilitySnapshot, MobilityState, Model } from './types'
@@ -75,17 +75,21 @@ export function seedNetwork(model: Model = 'rwp', seed = SEED): MobilitySnapshot
   }
 }
 
-/** One tick in place; returns the links that appeared and broke. */
-export function tickOnce(s: MobilitySnapshot): { up: number; down: number; fresh: string[] } {
+/** One tick in place; returns the links that appeared and broke, and the nodes that drew a new waypoint. */
+export function tickOnce(s: MobilitySnapshot): { up: number; down: number; fresh: string[]; gone: NetLink[]; arrived: string[] } {
   const before = s.links
+  const targets = Object.fromEntries(Object.entries(s.motion).map(([id, m]) => [id, `${m.tx},${m.ty}`]))
   moveAll(tickRng(s.seed, s.tick), s.nodes, s.motion, PARAMS, s.groups)
   s.links = unitDiskLinks(s.nodes, s.range)
   const was = new Set(before.map((l) => linkKey(l.a, l.b)))
+  const now = new Set(s.links.map((l) => linkKey(l.a, l.b)))
   const fresh = s.links.map((l) => linkKey(l.a, l.b)).filter((k) => !was.has(k))
+  const gone = before.filter((l) => !now.has(linkKey(l.a, l.b)))
+  const arrived = s.nodes.map((n) => n.id).filter((id) => s.motion[id] && `${s.motion[id].tx},${s.motion[id].ty}` !== targets[id])
   const { up, down } = recordLinks(s, before, s.links, s.nodes)
   for (const n of s.nodes) s.history.push({ x: n.x, y: n.y })
   s.tick += 1
-  return { up, down, fresh }
+  return { up, down, fresh, gone, arrived }
 }
 
 const one = (v: number | null) => (v === null ? null : v.toFixed(1))
@@ -102,16 +106,22 @@ export function runAdvance(state: MobilityState, input: unknown): Result {
     return { steps, finalSnapshot: cloneNet(work) }
   }
   for (let i = 0; i < ticks; i++) {
-    const { up, down, fresh } = tickOnce(work)
-    const links: Record<string, HighlightKind> = Object.fromEntries(fresh.map((k) => [k, 'new' as const]))
+    const { up, down, fresh, gone, arrived } = tickOnce(work)
+    const links: Record<string, HighlightKind> = {
+      ...Object.fromEntries(fresh.map((k) => [k, 'new' as const])),
+      ...Object.fromEntries(gone.map((l) => [linkKey(l.a, l.b), 'dropped' as const])),
+    }
+    const reached = arrived.length ? `; ${listIds(arrived)} reached ${arrived.length === 1 ? 'its waypoint' : 'their waypoints'}` : ''
     push(
-      `Tick ${work.tick}: ${plural(up, 'link')} appeared and ${down} broke, ${plural(work.links.length, 'link')} now.`,
+      `Tick ${work.tick}: ${plural(up, 'link')} appeared and ${down} broke, ${plural(work.links.length, 'link')} now${reached}.`,
       L.advance.tick,
-      { links },
+      { links, nodes: Object.fromEntries(arrived.map((id) => [id, 'found' as const])) },
       [],
       { t: i },
     )
     why(work.model === 'rpgm' ? WHY.tickRpgm() : WHY.tickRwp())
+    // A broken link stays on screen for this one step, dashed, so the break can be seen.
+    steps[steps.length - 1].snapshot.links.push(...gone.map((l) => ({ ...l, broken: true })))
   }
   const d = one(meanDuration(work))
   push(

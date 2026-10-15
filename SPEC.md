@@ -885,7 +885,7 @@ Member-to-head links stay drawn as `tree` on every step and at rest. On the seed
 11     net.recompute_gateways()
 ```
 
-Steps: "Type a node id, such as 9." or "There is no node `{u}`." (line 1); "`{u}` leaves the network." (line 2); per orphan in node order, "`{n}` joins cluster head `{h}`, which it can still hear." (line 7) or "`{n}` hears no cluster head, so it is undecided again." (line 9); the Elect head and member rows at line 10, each head adding one to `elections`; "Gateways are now `{list}`." or "No node is a gateway now." (line 11). On the elected seed, 9 leaving sends 6 to head 8 and makes 4 and 2 heads of their own clusters: two new elections, and no gateway is left.
+Steps: "Type a node id, such as 9." or "There is no node `{u}`." (line 1); "`{u}` leaves the network." (line 2); when `{u}` was no head, "`{u}` was not a cluster head, so no member loses its head." (line 3); per orphan in node order, "`{n}` joins cluster head `{h}`, which it can still hear." (line 7) or "`{n}` hears no cluster head, so it is undecided again." (line 9); the Elect head and member rows at line 10, each head adding one to `elections`; one step per node that gains or loses the gateway role, "`{n}` now hears cluster heads `{heads}`, so it becomes a gateway." or "`{n}` no longer hears two cluster heads, so it stops being a gateway." (line 11); then "Gateways are now `{list}`." or "No node is a gateway now." (line 11). On the elected seed, 9 leaving sends 6 to head 8 and makes 4 and 2 heads of their own clusters: two new elections, and no gateway is left.
 
 **Node joins** (`join`, `inputKind: "text"`, placeholder "New id and its neighbors, e.g. 7 6 8")
 
@@ -900,7 +900,7 @@ Steps: "Type a node id, such as 9." or "There is no node `{u}`." (line 1); "`{u}
 8      net.recompute_gateways()
 ```
 
-Steps: "Type a new id and its neighbors, such as 7 6 8.", "Node `{u}` already exists.", or "There is no node `{x}` to link to." (line 1); "`{u}` joins the network with links to `{list}`." (line 2); "`{u}` joins cluster head `{h}`, which it can hear." (line 5) or "`{u}` hears no cluster head, so it becomes one." (line 7, adding one to `elections`); the gateway row of Leave at line 8. The new node is placed at the centroid of its neighbors plus (0.3, 0.3) when that spot is at least 1 from every node, and otherwise at the first such spot on rings around the centroid (ADR-016); on the elected seed, 7 linked to 6 and 8 lands at (2.5, 2.2) and joins head 8.
+Steps: "Type a new id and its neighbors, such as 7 6 8.", "Node `{u}` already exists.", or "There is no node `{x}` to link to." (line 1); "`{u}` joins the network with links to `{list}`." (line 2); "`{u}` joins cluster head `{h}`, which it can hear." (line 5) or "`{u}` hears no cluster head, so it becomes one." (line 7, adding one to `elections`); the gateway rows of Leave at line 8. The new node is placed at the centroid of its neighbors plus (0.3, 0.3) when that spot is at least 1 from every node, and otherwise at the first such spot on rings around the centroid (ADR-016); on the elected seed, 7 linked to 6 and 8 lands at (2.5, 2.2) and joins head 8.
 
 **Live fields:** `nodes`, `heads`, `gateways`, `elections`.
 
@@ -1090,7 +1090,7 @@ The RPGM listing replaces lines 8 to 15:
 | Trigger | Line | Description |
 |---|---|---|
 | Out of range input | 1 | "Type a number of ticks from 1 to 40." |
-| Per tick | 6 | "Tick `{t}`: `{up}` links appeared and `{down}` broke, `{m}` links now." |
+| Per tick | 6 | "Tick `{t}`: `{up}` links appeared and `{down}` broke, `{m}` links now." (with "; `{ids}` reached their waypoints" when nodes drew a new waypoint, those nodes found; new links new, and the broken links drawn dashed and dropped for this step only) |
 | Done | 7 | "After `{t}` ticks the links changed `{c}` times, a link lasts `{d}` ticks on average, and `{p}` % of node pairs had a path." |
 
 The metrics named in the done step are the protocol-independent ones Week 5 lists (Misra pp. 249-250). Mean link duration uses `closedDurations`; with none, it reads "no link has broken yet".
@@ -1145,9 +1145,9 @@ Steps: "`{k}` of `{n}` recorded positions fall in the centre quarter of the area
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
-| Per node, marked | 5 | "`{u}` and `{w}` are neighbors of `{v}` but not of each other, so `{v}` is marked." | `{v}` found |
+| Per node, marked | 5 | "`{u}` and `{w}` are neighbors of `{v}` but not of each other, so `{v}` is marked." | `{v}` found, `{u}` and `{w}` current, their links to `{v}` active |
 | Per node, not marked | 4 | "Every two neighbors of `{v}` are neighbors of each other, so `{v}` is not marked." | `{v}` visited |
-| Per marked node, pruned | 11 | "`{u}` has a larger id and covers `{v}` and all its neighbors, so `{v}` is unmarked." | `{v}` dropped |
+| Per marked node, pruned | 11 | "`{u}` has a larger id and covers `{v}` and all its neighbors, so `{v}` is unmarked." | `{v}` dropped, `{u}` found |
 | Per marked node, kept | 10 | "No marked neighbor with a larger id covers all of `{v}`'s neighbors, so `{v}` stays." | `{v}` found |
 | Result | 12 | "The connected dominating set is `{cds}`: `{k}` of `{n}` nodes." | set tree |
 
@@ -1668,6 +1668,8 @@ Steps lift the Section 10.7 Buddy Join rows at line 6 (focus `addresses`), after
 | Per member that lost its head, rejoins | 10 | "`{v}` no longer hears `{old}`, so it joins cluster head `{h}`." | clusters |
 | Per member that lost its head, new head | 12 | "`{v}` no longer hears `{old}` and hears no other head, so it becomes a head." | clusters |
 | Done | 14 | "After `{t}` ticks the camp elected `{e}` new heads." | clusters |
+
+On both tick rows the links that broke in this tick are drawn dashed and dropped for that step only.
 
 The test pins `elections` after 20 ticks for both variants on the seed and requires the RPGM count to be lower. If a change to `src/lib/sim/mobility.ts` breaks that, the seed may change (and this section with it); the model may not be tuned to force the result.
 

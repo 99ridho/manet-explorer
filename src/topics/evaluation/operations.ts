@@ -1,5 +1,5 @@
 // SPEC.md §10.9: UDG and quasi UDG links, Wu's connected dominating set, and metrics over seeds.
-import { cloneNet, listIds, makeLink, neighbors, plural, recorder } from '@/lib/net'
+import { cloneNet, linkKey, listIds, makeLink, neighbors, plural, recorder } from '@/lib/net'
 import { dist, unitDiskLinked } from '@/lib/sim/geometry'
 import { fmtDelay, fmtOverhead, fmtPdr, mean, ML, std, summarize, type Summary } from '@/lib/sim/metrics'
 import { spread, uniform } from '@/lib/sim/placement'
@@ -142,7 +142,10 @@ export function runCds(state: EvaluationState): Result {
     if (pair) {
       work.marked.push(v)
       marks[v] = 'found'
-      push(`${pair[0]} and ${pair[1]} are neighbors of ${v} but not of each other, so ${v} is marked.`, C.marked, { nodes: { ...marks } }, [], { v })
+      push(`${pair[0]} and ${pair[1]} are neighbors of ${v} but not of each other, so ${v} is marked.`, C.marked, {
+        nodes: { ...marks, [pair[0]]: 'current', [pair[1]]: 'current' },
+        links: { [linkKey(v, pair[0])]: 'active', [linkKey(v, pair[1])]: 'active' },
+      }, [], { v })
       why(WHY.marked(v))
     } else {
       marks[v] = 'visited'
@@ -161,7 +164,7 @@ export function runCds(state: EvaluationState): Result {
     }
     kept.delete(v)
     marks[v] = 'dropped'
-    push(`${u} has a larger id and covers ${v} and all its neighbors, so ${v} is unmarked.`, C.pruned, { nodes: { ...marks } }, [], { v, u })
+    push(`${u} has a larger id and covers ${v} and all its neighbors, so ${v} is unmarked.`, C.pruned, { nodes: { ...marks, [u]: 'found' }, links: { [linkKey(u, v)]: 'active' } }, [], { v, u })
     why(WHY.pruned(v, u))
   }
   work.cds = work.marked.filter((v) => kept.has(v))
