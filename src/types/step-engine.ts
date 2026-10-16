@@ -1,5 +1,7 @@
-// Core domain types: dsa-course SPEC §7 with the SPEC.md §7.1 amendment (no language snippets).
+// Core domain types: dsa-course SPEC §7 with the SPEC.md §7.1 amendment (no language snippets)
+// and §7.3 (the ns-3 script in place of the structure spec).
 import type React from 'react'
+import type { Ns3Script } from './ns3'
 import type { TopicStory } from './story'
 
 export interface Step<TSnapshot> {
@@ -37,38 +39,8 @@ export interface VariantConfig {
   default: string
 }
 
-export interface AdtOperation {
-  name: string // e.g. "push"
-  signature: string // e.g. "push(item)"
-  cost: string | Record<string, string> // one cost, or one per representation key
-  note?: string // one sentence, house style
-  operationIds?: string[] // visualizer operations that demonstrate it (one per variant when scoped)
-}
-
-export interface StructureField {
-  name: string // e.g. "first"
-  type: string // e.g. "Node"
-  role: string // e.g. "top of the stack, null when empty"
-}
-
-export interface Representation {
-  label: string // e.g. "Resizing array"
-  declaration: string[] // language-neutral pseudo-declaration, one line each
-  fields: StructureField[]
-  invariants?: string[] // invariants this representation adds to the ADT's
-}
-
-export interface StructureSpec<TSnapshot = unknown> {
-  adt: {
-    name: string // e.g. "Stack"
-    summary: string // one sentence; for algorithm topics it says there is no ADT to call
-    operations: AdtOperation[] // empty for algorithm topics
-    invariants: string[]
-  }
-  representations: Record<string, Representation> // key = variant value, or "default" alone when every variant shares one
-  algorithms?: string[] // operation ids that run an algorithm over the structure rather than an ADT operation
-  liveFields: (snapshot: TSnapshot, variant?: string) => Record<string, string | number> // scalars only, at most six
-}
+/** The live-field chips of SPEC.md §8: scalars only, at most six, read from the snapshot shown. */
+export type LiveFields<TSnapshot = unknown> = (snapshot: TSnapshot, variant?: string) => Record<string, string | number>
 
 export interface TopicModule<TState = unknown, TSnapshot = unknown> {
   slug: string
@@ -78,11 +50,12 @@ export interface TopicModule<TState = unknown, TSnapshot = unknown> {
   pseudocode: Record<string, string[]> // operationId -> lines of pseudocode
   CanvasComponent: React.ComponentType<{ snapshot: TSnapshot; variant?: string }>
   content: { coreMaterial: string } // SPEC.md §11; the Scenario tab replaced Real-World Usage (§20)
-  structure: StructureSpec<TSnapshot> // the Protocol spec of SPEC.md §7.3 (ProtocolPanel, LiveFields)
+  liveFields: LiveFields<TSnapshot>
   variant?: VariantConfig
   createInitialState: (variant?: string) => TState
   randomize: (state: TState, variant?: string) => TState // instant, no animation
   story: TopicStory // SPEC.md §20: the Scenario tab and the Who's who line
+  ns3?: Ns3Script // SPEC.md §7.3: the ns-3 tab; every topic has one, case-study simulators do not
 }
 
 /** Input shapes produced by OperationBar for each `inputKind`. */

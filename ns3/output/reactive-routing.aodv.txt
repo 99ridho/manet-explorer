@@ -1,0 +1,6 @@
+protocol aodv
+t = 8 s: S reaches D through S A C D
+t = 10 s: link C-D breaks
+t = 25 s: S reaches D through S B E D
+S got 23 of 25 echo replies
+15 RREQ and RERR broadcasts in all

@@ -40,5 +40,9 @@ A **watchdog** is a defense: a node that hands a packet on keeps listening to ch
 4. Switch to **Wormhole**, run **Discover route**, then **Send packets** \`5\`. Every report arrives, yet every one crossed the attackers' tunnel.
 5. Switch to **No attacker** and repeat, to see the network as it should behave.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+The watchdog threshold of 3 is this demo's, and a forward into the tunnel counts as heard; the watchdog cannot detect collaborative attacks (Misra pp. 444-445).`,
 }

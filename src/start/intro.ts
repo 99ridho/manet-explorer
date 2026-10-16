@@ -4,7 +4,7 @@ import { cloneNet, findLink, linkKey, listIds, neighbors, plural, recorder } fro
 import { connectedUnitDisk } from '@/lib/sim/placement'
 import { mulberry32, newSeed } from '@/lib/sim/rng'
 import type { HighlightKind, NetSnapshot } from '@/types/net'
-import type { OperationDefinition, OperationResult, StructureSpec, TopicModule } from '@/types/step-engine'
+import type { LiveFields, OperationDefinition, OperationResult, TopicModule } from '@/types/step-engine'
 import type { TopicStory } from '@/types/story'
 import { IntroCanvas } from './canvas'
 import { introPseudocode, L } from './pseudocode'
@@ -145,37 +145,10 @@ const operations: OperationDefinition<IntroSnapshot, unknown, IntroSnapshot>[] =
   { id: 'leave', label: 'Phone walks away', inputKind: 'text', placeholder: 'A phone, e.g. B', run: runLeave },
 ]
 
-const structure: StructureSpec<IntroSnapshot> = {
-  adt: {
-    name: 'Multihop forwarding',
-    summary: 'Phones pass a message from neighbor to neighbor until it reaches the phone it is for.',
-    operations: [
-      {
-        name: 'DATA',
-        signature: 'DATA(dst, message)',
-        cost: '',
-        note: 'The message itself, handed over one hop at a time.',
-        operationIds: ['send'],
-      },
-    ],
-    invariants: ['A phone hands a message only to a neighbor in range.'],
-  },
-  representations: {
-    default: {
-      label: 'Phones and links',
-      declaration: ['class Network:', '    nodes: list  # every phone', '    links: set   # pairs in range'],
-      fields: [
-        { name: 'nodes', type: 'list', role: 'every phone with its position' },
-        { name: 'links', type: 'set', role: 'the pairs that can hear each other' },
-      ],
-    },
-  },
-  algorithms: ['leave'],
-  liveFields: (s) => ({
-    phones: s.nodes.filter((n) => !n.down).length,
-    links: s.links.length,
-  }),
-}
+const liveFields: LiveFields<IntroSnapshot> = (s) => ({
+  phones: s.nodes.filter((n) => !n.down).length,
+  links: s.links.length,
+})
 
 export const introStory: TopicStory = {
   scenario: '',
@@ -195,7 +168,7 @@ export const intro: TopicModule<IntroSnapshot, IntroSnapshot> = {
   pseudocode: introPseudocode,
   CanvasComponent: IntroCanvas,
   content: { coreMaterial: '' },
-  structure,
+  liveFields,
   createInitialState: introSeed,
   randomize: () => randomIntro(newSeed()),
   story: introStory,

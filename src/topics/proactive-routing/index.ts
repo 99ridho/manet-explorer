@@ -4,8 +4,9 @@ import { ProactiveCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { proactiveOperations, randomNetwork, seedNetwork } from './operations'
 import { proactivePseudocode } from './pseudocode'
+import { proactiveNs3 } from './ns3'
 import { story } from './story'
-import { proactiveStructure } from './structure'
+import { proactiveLiveFields } from './live-fields'
 import type { DsdvSnapshot, DsdvState, Update } from './types'
 
 const asUpdate = (v?: string): Update => (v === 'full' ? 'full' : 'incremental')
@@ -18,7 +19,7 @@ export const proactiveRouting: TopicModule<DsdvState, DsdvSnapshot> = {
   pseudocode: proactivePseudocode,
   CanvasComponent: ProactiveCanvas,
   content: { coreMaterial },
-  structure: proactiveStructure,
+  liveFields: proactiveLiveFields,
   variant: {
     id: 'update',
     label: 'Update',
@@ -31,4 +32,5 @@ export const proactiveRouting: TopicModule<DsdvState, DsdvSnapshot> = {
   createInitialState: (variant) => seedNetwork(asUpdate(variant)),
   randomize: (_state, variant) => randomNetwork(asUpdate(variant), newSeed()),
   story,
+  ns3: proactiveNs3,
 }

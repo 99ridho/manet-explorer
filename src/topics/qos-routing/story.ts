@@ -34,5 +34,9 @@ A QoS route promises a level of service, such as a minimum bandwidth or a maximu
 4. Choose **Send packets**, type \`20\`, and press **Go**. Relay B starts with the least battery and runs out at packet 20, which breaks the path.
 5. Switch to **Energy**, run **Find path** \`A E\`, then send 20 packets. This path avoids B, and its weakest relay still has battery left.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+Every relay on the path spends one unit of battery per packet in this demo, and a relay at 0 goes down.`,
 }

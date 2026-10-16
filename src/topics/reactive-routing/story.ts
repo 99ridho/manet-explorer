@@ -37,5 +37,9 @@ Most of the time nobody is sending anything. A reactive protocol such as AODV or
 5. Run **Discover route** \`S D\` again. The new route avoids the school.
 6. Switch to **DSR** and repeat. This time the request carries a list of every radio it passed, and the data packet carries the whole route in its header.
 
-Read the **Why** line under each step. It says the reason a radio does what it does.`,
+Read the **Why** line under each step. It says the reason a radio does what it does.
+
+## This demo's choices
+
+AODV uses the destination sequence number to pick the most recent route; this demo does not model it.`,
 }

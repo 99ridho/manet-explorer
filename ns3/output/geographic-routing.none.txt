@@ -1,0 +1,2 @@
+recovery none, S is 2.00 units from D
+no neighbor of S is closer to D than 2.00, so greedy forwarding drops the packet

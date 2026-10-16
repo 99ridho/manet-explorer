@@ -4,8 +4,9 @@ import { ReactiveCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { randomNetwork, reactiveOperations, seedNetwork } from './operations'
 import { reactivePseudocode } from './pseudocode'
+import { reactiveNs3 } from './ns3'
 import { story } from './story'
-import { reactiveStructure } from './structure'
+import { reactiveLiveFields } from './live-fields'
 import type { Protocol, ReactiveSnapshot, ReactiveState } from './types'
 
 const asProtocol = (v?: string): Protocol => (v === 'dsr' ? 'dsr' : 'aodv')
@@ -18,7 +19,7 @@ export const reactiveRouting: TopicModule<ReactiveState, ReactiveSnapshot> = {
   pseudocode: reactivePseudocode,
   CanvasComponent: ReactiveCanvas,
   content: { coreMaterial },
-  structure: reactiveStructure,
+  liveFields: reactiveLiveFields,
   variant: {
     id: 'protocol',
     label: 'Protocol',
@@ -31,4 +32,5 @@ export const reactiveRouting: TopicModule<ReactiveState, ReactiveSnapshot> = {
   createInitialState: (variant) => seedNetwork(asProtocol(variant)),
   randomize: (_state, variant) => randomNetwork(asProtocol(variant), newSeed()),
   story,
+  ns3: reactiveNs3,
 }

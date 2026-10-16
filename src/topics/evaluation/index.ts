@@ -4,8 +4,9 @@ import { EvaluationCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { evaluationOperations, randomNetwork, seedNetwork } from './operations'
 import { evaluationPseudocode } from './pseudocode'
+import { evaluationNs3 } from './ns3'
 import { story } from './story'
-import { evaluationStructure } from './structure'
+import { evaluationLiveFields } from './live-fields'
 import type { EvaluationSnapshot, EvaluationState, Graph } from './types'
 
 const asGraph = (v?: string): Graph => (v === 'qudg' ? 'qudg' : 'udg')
@@ -18,7 +19,7 @@ export const evaluation: TopicModule<EvaluationState, EvaluationSnapshot> = {
   pseudocode: evaluationPseudocode,
   CanvasComponent: EvaluationCanvas,
   content: { coreMaterial },
-  structure: evaluationStructure,
+  liveFields: evaluationLiveFields,
   variant: {
     id: 'graph',
     label: 'Graph model',
@@ -31,4 +32,5 @@ export const evaluation: TopicModule<EvaluationState, EvaluationSnapshot> = {
   createInitialState: (variant) => seedNetwork(asGraph(variant)),
   randomize: (_state, variant) => randomNetwork(asGraph(variant), newSeed()),
   story,
+  ns3: evaluationNs3,
 }

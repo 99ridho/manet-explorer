@@ -24,7 +24,7 @@ import { WHY } from './why'
 
 type Result = OperationResult<MobilitySnapshot>
 
-/** This demo's parameters (SPEC §10.8), shown in the Protocol tab. */
+/** This demo's parameters (SPEC §10.8), named in the Scenario tab. */
 export const PARAMS: MobilityParams = { area: { w: 10, h: 6 }, speed: [0.3, 1.0], pause: [0, 2], groupSpeed: 1, radius: 1 }
 export const SEED = 5
 const IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']

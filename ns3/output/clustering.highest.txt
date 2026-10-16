@@ -1,0 +1,8 @@
+rule highest
+  node 9 is a cluster head
+  node 4 joins head 9
+  node 2 joins head 9
+  node 6 joins head 9, gateway between heads 8 9
+  node 8 is a cluster head
+  node 3 joins head 8
+  node 5 joins head 8

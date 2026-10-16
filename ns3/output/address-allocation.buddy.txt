@@ -1,0 +1,5 @@
+scheme buddy, addresses: A 1 B 9 C 13
+D picks C, whose largest range has 4 addresses
+C keeps 13 to 14 and gives 15 to 16 to D
+D takes address 15 without asking any other node
+D configures 10.0.0.15 on its Wi-Fi interface

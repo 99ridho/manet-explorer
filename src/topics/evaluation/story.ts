@@ -39,5 +39,9 @@ A *unit disk graph* links two lamps when they are within range and never otherwi
 3. Switch to **Quasi unit disk graph** and run **Build links** again. Pairs in the uncertain band now depend on a random draw.
 4. Choose **Metrics over seeds**, type \`5\`, and press **Go**. The same comparison runs on five layouts, and the whiskers show how much the result swings. q = 0.8 and the radius of 2 for this run are this demo's choices.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+Below q = 0.8 of the radius two nodes always link; in the band between q and the radius they link when a draw comes out below 0.5. Both values are this demo's, and the course reference leaves them open. Metrics over seeds places 10 nodes in a 6 × 4 area and runs three flows of ten packets per seed over AODV-style routes; all of these are this simulator's choices.`,
 }

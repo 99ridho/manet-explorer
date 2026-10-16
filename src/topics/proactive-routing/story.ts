@@ -38,5 +38,9 @@ DSDV keeps routes fresh with *sequence numbers*. Each tent stamps news about its
 3. Press **Reset**, switch to **Full dump**, and move M3 next to M6 again. Compare the **rowsSent** live field: a full dump repeats rows that did not change (Misra p. 66).
 4. Use the buttons under the network to read another tent's table.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+This demo raises a moved node's own sequence number by 1; the course reference does not fix the step. In this demo a new neighbor sends the moved node its whole table once, so an incremental update does not hide routes that did not change; the slides do not describe this case.`,
 }

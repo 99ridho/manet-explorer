@@ -1,0 +1,17 @@
+attacker wormhole
+M2 replays the RREQ that came through the tunnel
+t = 1018 ms: S gets an RREP with S M1 M2 D
+t = 1046 ms: S gets an RREP with S A B C D
+S uses the first route to arrive: S M1 M2 D
+packet 1: S never hears M1 pass it on, 1 failure
+packet 2: S never hears M1 pass it on, 2 failures
+packet 3: S never hears M1 pass it on, 3 failures
+packet 4: S never hears M1 pass it on, 4 failures
+S reports M1 and switches to S A B C D
+packet 5: S hears A pass it on
+packet 6: S hears A pass it on
+packet 7: S hears A pass it on
+packet 8: S hears A pass it on
+packet 9: S hears A pass it on
+packet 10: S hears A pass it on
+D received 10 of 10 packets

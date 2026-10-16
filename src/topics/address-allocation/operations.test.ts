@@ -1,6 +1,6 @@
 // Executable form of the SPEC.md §10.7 step tables and seed results.
 import { describe, expect, it } from 'vitest'
-import { addressStructure } from './structure'
+import { addressLiveFields } from './live-fields'
 import {
   addressLabels,
   randomNetwork,
@@ -66,7 +66,7 @@ describe('leave and crash, Buddy', () => {
     const { steps, finalSnapshot } = runCrashBuddy(seedNetwork(), 'C')
     expect(descs(steps)).toEqual(['C disappears without a goodbye.', '4 addresses went with C, and no node knows they are free.'])
     expect(finalSnapshot.leaked).toBe(4)
-    expect(addressStructure.liveFields(finalSnapshot, 'buddy')).toEqual({ nodes: 2, free: 10, leaked: 4, conflicts: 0 })
+    expect(addressLiveFields(finalSnapshot, 'buddy')).toEqual({ nodes: 2, free: 10, leaked: 4, conflicts: 0 })
   })
 })
 

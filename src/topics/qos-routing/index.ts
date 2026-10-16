@@ -4,8 +4,9 @@ import { QosCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { qosOperations, randomNetwork, seedNetwork } from './operations'
 import { qosPseudocode } from './pseudocode'
+import { qosNs3 } from './ns3'
 import { story } from './story'
-import { qosStructure } from './structure'
+import { qosLiveFields } from './live-fields'
 import type { Metric, QosSnapshot, QosState } from './types'
 
 const METRICS: Metric[] = ['bandwidth', 'etx', 'energy', 'hop']
@@ -19,7 +20,7 @@ export const qosRouting: TopicModule<QosState, QosSnapshot> = {
   pseudocode: qosPseudocode,
   CanvasComponent: QosCanvas,
   content: { coreMaterial },
-  structure: qosStructure,
+  liveFields: qosLiveFields,
   variant: {
     id: 'metric',
     label: 'Metric',
@@ -34,4 +35,5 @@ export const qosRouting: TopicModule<QosState, QosSnapshot> = {
   createInitialState: (variant) => seedNetwork(asMetric(variant)),
   randomize: (_state, variant) => randomNetwork(asMetric(variant), newSeed()),
   story,
+  ns3: qosNs3,
 }

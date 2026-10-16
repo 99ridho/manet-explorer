@@ -35,5 +35,9 @@ A server cannot be counted on in a network whose shape keeps changing (Misra p. 
 3. The reading room opens its door. Choose **Merge partition** and press **Go**. Two pairs of laptops turn out to share an address, and each conflict is resolved by joining again.
 4. Switch to **Query-based DAD** and run **Join** \`D C\`, then **Merge partition**. Count the AREQ and AREP messages in the **control** live field.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+The limit of 3 AREQ tries is this demo's choice. A node that vanishes suddenly takes its pool with it, so nodes need periodic synchronization (Misra pp. 338-339); this demo shows the leak only. MANETconf gives each partition an ID so two nodes that meet can tell a merge is happening (Misra p. 338).`,
 }

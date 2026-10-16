@@ -1,0 +1,9 @@
+recovery perimeter, S is 2.00 units from D
+no neighbor of S is closer to D than 2.00, so the packet switches to perimeter mode
+S sweeps clockwise and forwards to A
+A sweeps clockwise and forwards to B
+B sweeps clockwise and forwards to C
+C is 1.80 from D, closer than S, so the packet returns to greedy mode
+C forwards greedily to E (0.95 from D)
+E forwards greedily to D
+delivered after 5 hops: S A B C E D

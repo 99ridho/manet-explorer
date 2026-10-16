@@ -5,7 +5,7 @@ import { scenario } from './content'
 import { MOBILITY_LABEL, campOperations, randomNetwork, seedNetwork } from './operations'
 import { campPseudocode } from './pseudocode'
 import { cast } from './story'
-import { campStructure } from './structure'
+import { campLiveFields } from './live-fields'
 import type { CampSnapshot, CampState, Mobility } from './types'
 
 const asMobility = (v?: string): Mobility => (v === 'rwp' ? 'rwp' : 'rpgm')
@@ -18,7 +18,7 @@ export const campSimulator: TopicModule<CampState, CampSnapshot> = {
   pseudocode: campPseudocode,
   CanvasComponent: CampCanvas,
   content: { coreMaterial: '' },
-  structure: campStructure,
+  liveFields: campLiveFields,
   variant: {
     id: 'mobility',
     label: 'Movement',

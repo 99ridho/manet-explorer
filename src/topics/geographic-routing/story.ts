@@ -39,5 +39,9 @@ A sensor that knows positions needs only a neighbor table, not a routing table, 
 3. Switch to **Greedy only** and route \`S D\` again. The packet is dropped at S, although a path exists.
 4. Press **Randomize** and route between the two nodes it marks, to see whether that network has a void.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+This demo sweeps clockwise from the direction of the destination, or of the previous node, and takes the first planar link.`,
 }

@@ -36,5 +36,9 @@ In a *hierarchical* network, a *cluster head* manages each cluster and links it 
 3. Press **Reset**, run **Elect** again, then choose **Node joins** and type \`7 6 8\`. A new radio arrives near the path and simply joins the head it can hear.
 4. Switch to **Lowest ID** and run **Elect**. The same field ends up with many more, smaller clusters.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+LCA periodically discards its topology information and rebuilds from scratch (Misra pp. 31-32); this demo repairs only the clusters a leaving or joining node touches.`,
 }

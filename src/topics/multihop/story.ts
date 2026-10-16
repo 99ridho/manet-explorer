@@ -36,5 +36,9 @@ A message from A to F cannot jump straight across. It hops from router to router
 3. Choose **Link ETX**, type \`C D 0.8 0.5\`, and press **Go**. Rain over the river makes the C-D link drop packets. The step shows how many tries one delivery takes on average.
 4. Switch to **Shadowing** and run **Build links** again. Walls and trees now weaken each signal by a random amount, so some links appear or vanish.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+The shadowing spread of 4 dB is this demo's value: the Week 5 slide gives the Gaussian term without a number.`,
 }

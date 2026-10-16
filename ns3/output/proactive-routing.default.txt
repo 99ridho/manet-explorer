@@ -1,0 +1,16 @@
+t = 40 s, M2's table:
+  dest  next  hops  seq
+  M1    M1    1     6
+  M3    M3    1     6
+  M4    M4    1     6
+  M5    M4    2     4
+  M6    M4    2     6
+t = 45 s: M3 moves next to M6
+t = 90 s, M2's table:
+  dest  next  hops  seq
+  M1    M1    1     12
+  M3    M4    3     10
+  M4    M4    1     12
+  M5    M4    2     12
+  M6    M4    2     12
+31 updates carried every row (full dumps), 187 carried fewer (incremental) in 90 s

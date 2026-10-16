@@ -17,7 +17,7 @@ type Result = OperationResult<CampSnapshot>
 type Push = ReturnType<typeof recorder<CampSnapshot>>['push']
 type Why = ReturnType<typeof recorder<CampSnapshot>>['why']
 
-/** This demo's parameters (SPEC §19.2), shown in the Protocol tab. */
+/** This demo's parameters (SPEC §19.2). */
 export const PARAMS: MobilityParams = { area: { w: 12, h: 8 }, speed: [0.3, 0.8], pause: [0, 2], groupSpeed: 0.5, radius: 0.8 }
 export const SPACE = 256
 const RANGE = 3
@@ -28,7 +28,7 @@ export const TEAMS = [
   ['7', '5', '1'],
 ]
 const JOIN_ORDER = ['9', '4', '2', '6', '8', '3', '5', '7', '1']
-/** Short enough for the variant tabs at 400px; the Protocol tab gives the full names. */
+/** Short enough for the variant tabs at 400px. */
 export const MOBILITY_LABEL: Record<Mobility, string> = { rpgm: 'Teams (RPGM)', rwp: 'Alone (RWP)' }
 const RUN_LABEL: Record<Mobility, string> = { rpgm: 'RPGM', rwp: 'RWP' }
 

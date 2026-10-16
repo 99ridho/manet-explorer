@@ -1,0 +1,5 @@
+model rpgm, seed 5, 200 s sampled once a second
+links appeared or broke 0 times
+no link broke
+42.9 % of node pairs had a path
+0.0 % of node time was in the centre quarter

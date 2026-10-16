@@ -20,7 +20,7 @@ const nodesOf = (s: unknown) => JSON.stringify(((s as WithNodes).nodes ?? []).ma
 // finalSnapshot becomes the next persistent state.
 interface VisualizerShellProps {
   topic: TopicModule
-  // The page mirrors the variant for the Structure panel; the shell still owns it and its resets.
+  // The page mirrors the variant for the ns-3 tab; the shell still owns it and its resets.
   onVariantChange?: (value: string) => void
 }
 
@@ -117,7 +117,7 @@ export function VisualizerShell({ topic, onVariantChange }: VisualizerShellProps
       <Card className="min-w-0 md:col-span-2">
         <CardContent>
           <Canvas snapshot={displayedSnapshot} variant={variant} />
-          <LiveFields structure={topic.structure} snapshot={displayedSnapshot} variant={variant} />
+          <LiveFields liveFields={topic.liveFields} snapshot={displayedSnapshot} variant={variant} />
           <WhosWho story={topic.story} ids={castIds} randomized={randomized} />
         </CardContent>
       </Card>

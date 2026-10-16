@@ -1,0 +1,17 @@
+attacker blackhole
+M answers at once, claiming the route S M D
+t = 1007 ms: S gets an RREP with S M D
+t = 1021 ms: S gets an RREP with S A B D
+S uses the first route to arrive: S M D
+packet 1: S never hears M pass it on, 1 failure
+packet 2: S never hears M pass it on, 2 failures
+packet 3: S never hears M pass it on, 3 failures
+packet 4: S never hears M pass it on, 4 failures
+S reports M and switches to S A B D
+packet 5: S hears A pass it on
+packet 6: S hears A pass it on
+packet 7: S hears A pass it on
+packet 8: S hears A pass it on
+packet 9: S hears A pass it on
+packet 10: S hears A pass it on
+D received 6 of 10 packets

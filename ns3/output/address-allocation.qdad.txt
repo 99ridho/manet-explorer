@@ -1,0 +1,7 @@
+scheme qdad, addresses: A 5 B 11 C 2
+D floods AREQ(12), try 1
+D floods AREQ(12), try 2
+D floods AREQ(12), try 3
+3 AREQs got no AREP, so D takes 12
+12 AREQ transmissions in all, counting relays
+D configures 10.0.0.12 on its Wi-Fi interface

@@ -70,13 +70,14 @@ manet-explorer/
 │   │   │       ├── MetricsBars.tsx   # the Section 9.1 comparison
 │   │   │       └── kinds.ts          # highlight-kind classes
 │   │   ├── case-study/               # FocusCaption, DecisionList, QuizPanel (as in dsa-course)
-│   │   ├── ProtocolPanel.tsx         # the Protocol tab (dsa-course StructurePanel, relabeled)
+│   │   ├── Ns3Panel.tsx              # the ns-3 tab, Section 7.3
 │   │   ├── MarkdownContent.tsx
 │   │   └── ui/                       # shadcn generated components
 │   ├── topics/
 │   │   ├── registry.ts
-│   │   ├── test-inputs.ts            # seed inputs shared by structure and pseudocode tests
-│   │   ├── structure.test.ts
+│   │   ├── test-inputs.ts            # seed inputs shared by live-field and pseudocode tests
+│   │   ├── live-fields.test.ts
+│   │   ├── ns3.test.ts               # the Section 7.3 contract
 │   │   ├── pseudocode.test.ts
 │   │   └── <slug>/
 │   │       ├── index.ts              # exports the TopicModule
@@ -84,7 +85,8 @@ manet-explorer/
 │   │       ├── operations.ts
 │   │       ├── operations.test.ts    # executable form of the Section 10 table
 │   │       ├── pseudocode.ts
-│   │       ├── structure.ts          # the protocol spec, Section 7.3
+│   │       ├── live-fields.ts        # the live-field chips, Section 7.3
+│   │       ├── ns3.ts                # the ns-3 script and its notes, Section 7.3
 │   │       ├── canvas.tsx
 │   │       └── content.ts            # generated from references/en, Section 11
 │   ├── case-studies/
@@ -96,6 +98,7 @@ manet-explorer/
 │   │   ├── use-followed-view.ts      # verbatim from dsa-course
 │   │   ├── predict-step.ts           # verbatim from dsa-course
 │   │   ├── net.ts                    # NetSnapshot helpers: clone, link key, neighbors, highlight
+│   │   ├── ns3.ts                    # loads ns3/*.cc and ns3/output/*.txt
 │   │   └── sim/
 │   │       ├── rng.ts                # mulberry32, seeded
 │   │       ├── geometry.ts           # distance, unit disk links, shadowing links
@@ -110,16 +113,23 @@ manet-explorer/
 │   └── types/
 │       ├── step-engine.ts            # dsa-course types with the Section 7 amendment
 │       ├── net.ts                    # Section 7.2
+│       ├── ns3.ts                    # Ns3Script, Section 7.3
 │       └── case-study.ts             # verbatim from dsa-course
 ├── e2e/
 │   ├── topic-page-layout.spec.ts
 │   └── case-study-page.spec.ts
+├── ns3/
+│   ├── <slug>.cc                     # one ns-3 script per topic, Section 7.3
+│   ├── runs.json                     # each script's argument and values
+│   ├── output/<slug>.<value>.txt     # captured by scripts/ns3-check.mjs
+│   └── Dockerfile                    # the pinned ns-3 build
 ├── references/
 │   ├── id/minggu-01.md … minggu-08.md   # the course slides, frozen (Section 11)
 │   └── en/Week-N-<slug>.md              # English references, Section 11
 ├── scripts/
 │   ├── extract-content.mjs
-│   └── check-copy.mjs
+│   ├── check-copy.mjs
+│   └── ns3-check.mjs
 ├── anti-slop/                        # audit records, Section 18
 ├── public/
 ├── index.html
@@ -129,7 +139,7 @@ manet-explorer/
 └── .github/workflows/deploy.yml
 ```
 
-Copied from dsa-course without change: `vite.config.ts` (with its SPA-fallback preview plugin), `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js`, `components.json`, `Dockerfile`, `nginx.conf`, `.dockerignore`, `src/lib/step-engine.ts`, `src/lib/use-followed-view.ts`, `src/lib/predict-step.ts`, `src/components/layout/*`, `src/components/case-study/*`, `src/components/ui/*`, `src/hooks/*`. Copied then changed as this spec says: `src/types/step-engine.ts` (Section 7.1), `CodePanel.tsx` (Section 8), `StructurePanel.tsx` renamed `ProtocolPanel.tsx` (Section 8), `MarkdownContent.tsx` (adds `remark-gfm` and table styles, because the references quote book tables), `scripts/check-copy.mjs` and `scripts/extract-content.mjs` (Section 11), `.github/workflows/deploy.yml` (image name only, Section 13).
+Copied from dsa-course without change: `vite.config.ts` (with its SPA-fallback preview plugin), `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js`, `components.json`, `Dockerfile`, `nginx.conf`, `.dockerignore`, `src/lib/step-engine.ts`, `src/lib/use-followed-view.ts`, `src/lib/predict-step.ts`, `src/components/layout/*`, `src/components/case-study/*`, `src/components/ui/*`, `src/hooks/*`. Copied then changed as this spec says: `src/types/step-engine.ts` (Section 7.1), `CodePanel.tsx` (Section 8), `StructurePanel.tsx` (removed; the ns-3 tab took its place, Section 7.3), `MarkdownContent.tsx` (adds `remark-gfm` and table styles, because the references quote book tables), `scripts/check-copy.mjs` and `scripts/extract-content.mjs` (Section 11), `.github/workflows/deploy.yml` (image name only, Section 13).
 
 ## 5. Theming
 
@@ -162,13 +172,13 @@ Topic-slug routes are canonical. The week is metadata shown in the sidebar and p
 
 Anything else redirects to `/`.
 
-`TopicPage` follows dsa-course Section 6 exactly: a two-column grid at `lg`, `VisualizerShell` on the left, materials on the right as tabs. The tabs are **Scenario** (default, Section 20) | **Core Material** | **Protocol**. Scenario renders `story.scenario` and Core Material renders `content.coreMaterial`, both with `MarkdownContent`; Protocol renders `ProtocolPanel` over `structure`. At `lg` the page is locked to the viewport: the document never scrolls, and only the Code listing and the active materials panel do. Below `lg` the columns stack, visualizer first, and the document scrolls. `<TopicView key={slug}>` resets the visualizer, the tab, and the variant mirror on navigation.
+`TopicPage` follows dsa-course Section 6 exactly: a two-column grid at `lg`, `VisualizerShell` on the left, materials on the right as tabs. The tabs are **Scenario** (default, Section 20) | **Core Material** | **ns-3**. Scenario renders `story.scenario` and Core Material renders `content.coreMaterial`, both with `MarkdownContent`; ns-3 renders `Ns3Panel` over `ns3` (Section 7.3). At `lg` the page is locked to the viewport: the document never scrolls, and only the Code listing and the active materials panel do. Below `lg` the columns stack, visualizer first, and the document scrolls. `<TopicView key={slug}>` resets the visualizer, the tab, and the variant mirror on navigation.
 
 ## 7. Core Domain Types
 
 ### 7.1 Step engine types
 
-`src/types/step-engine.ts` is `../dsa-course/src/types/step-engine.ts` with one amendment: **there are no language snippets.** Remove `SnippetLanguage`, `SnippetLine`, `OperationSnippets`, and the `snippets` field of `TopicModule`. Every other type (`Step`, `OperationResult`, `OperationFn`, `OperationDefinition`, `VariantConfig`, `AdtOperation`, `StructureField`, `Representation`, `StructureSpec`, `TopicModule`) is copied unchanged, including `inputKind: "key" | "edge" | "array" | "none" | "text"`, `placeholder`, `variants`, and `createInitialState(variant)`.
+`src/types/step-engine.ts` is `../dsa-course/src/types/step-engine.ts` with one amendment: **there are no language snippets.** Remove `SnippetLanguage`, `SnippetLine`, `OperationSnippets`, and the `snippets` field of `TopicModule`. Every other type (`Step`, `OperationResult`, `OperationFn`, `OperationDefinition`, `VariantConfig`, `TopicModule`) is copied unchanged, except that Section 7.3 replaces `structure` and its types with `liveFields` and `ns3`, including `inputKind: "key" | "edge" | "array" | "none" | "text"`, `placeholder`, `variants`, and `createInitialState(variant)`.
 
 Each operation ships one pseudocode listing, `pseudocode[operationId]`, written as Python that reads like the real implementation: named functions and method calls, not prose.
 
@@ -177,7 +187,7 @@ Each operation ships one pseudocode listing, `pseudocode[operationId]`, written 
 - Data uses Python types: `dict`, `set`, `list`, `deque`, tuples; standard helpers appear by their real names (`combinations`, `min(..., key=len)`, `next(clock)`, `reversed`).
 - Control flow is `for`, `while`, `if`/`elif`/`else`, `continue`, `return`. A skipped copy or an early exit is a `continue` or `return` with a comment, never a sentence.
 - A trailing `# comment` carries the protocol meaning the call names cannot ("the reverse path"); comments are prose under Section 18.
-- Functions a listing calls but does not define (`dist`, `linked`, `send_along`, `rerr_path`) are named for what they do and explained by the step narration or the Protocol tab. No imports, decorators, or comprehensions; type annotations appear only in the Protocol tab's class declarations.
+- Functions a listing calls but does not define (`dist`, `linked`, `send_along`, `rerr_path`) are named for what they do and explained by the step narration. No imports, decorators, comprehensions, or type annotations.
 - No blank lines inside a listing, so every line is highlightable. `src/topics/pseudocode.test.ts` checks the `def` line, the four-space indents, balanced brackets, and the colon on every block opener.
 - Each topic's `pseudocode.ts` exports `L`, the named line numbers of each listing, and `operations.ts` highlights through it rather than with bare numbers.
 
@@ -247,24 +257,23 @@ type HighlightKind = "current" | "new" | "found" | "visited" | "active" | "tree"
 **Links.** A seed lists its links explicitly, taken from the slide's `sisi:` line; the positions only draw them. A seed link is never recomputed from distance, because the slides draw abstract figures, not scaled maps. Geometry decides links only where a section says so: Section 10.1's Build links, Section 10.8's ticks, Randomize, and the case study movements.
 
 - **Unit disk rule:** nodes `p` and `q` are linked when `dist(p, q) <= range`. This is the UDG of Loo 3.2.1.1 with the radius scaled to `range`.
-- **Quasi unit disk rule** (Section 10.9): linked when `dist <= q * range`; not linked when `dist > range`; in between, linked when the seeded draw `rng() < 0.5`. Loo (pp. 41-42) calls the in-between band probabilistic without fixing a probability, so 0.5 is this simulator's choice, and the Protocol tab says so.
-- **Shadowing rule** (Section 10.1): linked when `10 * n * log10(range / dist) + X >= 0`, with `X` drawn from a normal distribution with mean 0 and standard deviation `sigma` dB. At `X = 0` this is the unit disk rule. `n = 2` (the free-space exponent the Week 1 slide gives). `sigma` is **[OPEN]** (Section 17), 4 dB until decided, and the Protocol tab labels it a parameter of this demo.
+- **Quasi unit disk rule** (Section 10.9): linked when `dist <= q * range`; not linked when `dist > range`; in between, linked when the seeded draw `rng() < 0.5`. Loo (pp. 41-42) calls the in-between band probabilistic without fixing a probability, so 0.5 is this simulator's choice, and the Scenario tab says so.
+- **Shadowing rule** (Section 10.1): linked when `10 * n * log10(range / dist) + X >= 0`, with `X` drawn from a normal distribution with mean 0 and standard deviation `sigma` dB. At `X = 0` this is the unit disk rule. `n = 2` (the free-space exponent the Week 1 slide gives). `sigma` is **[OPEN]** (Section 17), 4 dB until decided, and the Scenario tab labels it a parameter of this demo.
 
-### 7.3 The Protocol spec (`structure.ts`)
+### 7.3 The ns-3 script (`ns3/<slug>.cc`) and the live fields
 
-`StructureSpec` is reused without a type change. The UI calls it the Protocol spec, and each field carries protocol content:
+Every topic carries one ns-3 script, so the material runs from the story (Scenario) through the course notes (Core Material) and the step-by-step mechanism (the visualizer) to the same network over ns-3's radio, MAC, and IP stack. The Week 6 slide note names ns-3 as the simulator for labs and projects (Loo p. 66). ADR-020 records the decision.
 
-| Field | Holds |
-|---|---|
-| `adt.name` | The mechanism: "AODV", "DSDV", "MPR selection", "Buddy allocation" |
-| `adt.summary` | One sentence, house style |
-| `adt.operations` | The **message types** the mechanism exchanges. `name` is the message ("RREQ"), `signature` its fields ("RREQ(source, broadcastId, dest, destSeq, hops)"), `cost` what the reference says it costs, `note` one sentence, `operationIds` the visualizer operations that send it |
-| `adt.invariants` | Properties the mechanism keeps: "A node forwards the first copy of an RREQ and drops the rest." |
-| `representations` | The **per-node state** per variant value: a routing table, a route cache, an MPR set, an address pool. `declaration` is Python-like, same style as Section 7.1 |
-| `algorithms` | Operations that run over the network rather than send a named message: Find bridges, Build links, the metrics run |
-| `liveFields` | At most six scalars read from the snapshot; each chip's `key = value` fits 14 characters |
+- **File.** `ns3/<slug>.cc`, one self-contained C++ file per topic, run from an ns-3 release's `scratch/` folder with `./ns3 run`. It builds the topic's seed network: the seed's labels in seed order, positions at 50 m per slide unit, and the seed's links, from the unit disk rule through `RangePropagationLossModel` where the range reproduces them and from `MatrixPropagationLossModel` where the slide gives explicit links. The radio is 802.11b ad hoc at a fixed 1 Mbps in every script. Every number in a script is a seed value, a value ns-3 computes, or a demo value its comment labels as such.
+- **Variant.** The script takes the topic's variant id as its argument (`--protocol=aodv`) with the variant's values. A mechanism that ns-3 runs one way only takes no argument: `proactive-routing`, because ns-3's DSDV always sends both full dumps and incremental updates. `ns3/runs.json` lists each script's argument and values.
+- **Custom code.** Where mainline ns-3 has no module for the mechanism (MPR relaying, geographic routing, LCA, Buddy and QDAD, the QUDG and lossy-link models, the black hole, the wormhole, the watchdog), the script carries its own code.
+- **Output.** `scripts/ns3-check.mjs` builds every script against the release pinned in `ns3/Dockerfile` and runs it once per variant. With `--update` it writes `ns3/output/<slug>.<value>.txt` (`<slug>.default.txt` for a script without an argument); without it, it fails on any difference. Outputs are never edited by hand.
+- **Module.** `TopicModule.ns3` is an `Ns3Script` (`src/types/ns3.ts`): `file`, `source`, `arg`, `outputs` by variant value, and `notes`. `src/lib/ns3.ts` loads the files; each topic's `ns3.ts` adds the notes, short markdown saying what the script shows and where ns-3's result differs from the visualizer's. Case-study simulators have no `ns3`.
+- **Contract.** `src/topics/ns3.test.ts`: every topic has a script, its argument and outputs follow the variant toggle, and each output contains the seed results the topic's `operations.test.ts` pins wherever ns-3 reproduces them.
 
-`cost` quotes the English reference (Section 11): the reference's own sentence with its book and page, or an `O(...)` form when the reference states one. A cost the reference does not state is the empty string, and `ProtocolPanel` shows "Not stated in the course reference." rather than a guess.
+**Live fields.** `TopicModule.liveFields(snapshot, variant)` returns one to six scalars read from the snapshot shown; each chip's `key = value` fits 13 characters (`src/topics/live-fields.test.ts`). Each topic and case study keeps them in `live-fields.ts`.
+
+The demo values the Protocol tab used to name are named in each topic's Scenario tab, under "This demo's choices".
 
 ### 7.4 Registry
 
@@ -275,7 +284,7 @@ type HighlightKind = "current" | "new" | "found" | "visited" | "active" | "tree"
 As in dsa-course Section 8, with these differences.
 
 - **`CodePanel`**: shows `currentStep.description` and the Why line in one box, then a separate card with the call line and the `variables` as badges, then the numbered pseudocode listing. The call line is the def that encloses the highlighted line, with each parameter that `variables` binds written as `name=value` (`elect(net, rank=highest)`); it is left out when the step binds none, and the card is left out when it would be empty. The badges show the variables the call line does not use. Every step binds every parameter of its enclosing def except `net` (`None` for missing input), and every variable name appears in the listing, except the measures named in Sections 9.1 and 10.3 (ADR-017). **There is no tab strip and no `localStorage` language key.** It draws each four-space indent level at 2ch and renders a trailing `# comment` in the muted color, so a narrow card stays readable while the source keeps PEP 8 spacing. The listing keeps dsa-course's rules: lines soft-wrap with a hanging indent (`padding-left: (indent + 2)ch; text-indent: -2ch`), no horizontal scroll at any width, the listing is the only scroller at `lg`, it is keyboard focusable with a visible ring, and stepping keeps the highlighted line in view by setting the listing's own `scrollTop`, never `scrollIntoView`.
-- **`ProtocolPanel`**: dsa-course's `StructurePanel` with its headings renamed: "Messages" for the operation table (columns Message, Fields, Cost, Shown by), "Invariants", "Per-node state" for the representation blocks, "Algorithms over the network" for `algorithms`. The "on the canvas" badge follows the variant toggle, as before.
+- **`Ns3Panel`**: the ns-3 tab. The notes, then **Run it** (the `./ns3 run` command for the variant on the canvas, the pinned release, a Download link that saves `<slug>.cc`, and Copy script), then **Output** for that variant, then the numbered listing. Listing and output soft-wrap with `CodePanel`'s hanging indent and never scroll sideways; `//` comments render in the muted color; the listing is keyboard focusable with a visible ring.
 - **`NetworkCanvas`** (`components/visualizer/canvas/`): one SVG used by every topic and case study.
   - `viewBox` from the node extents plus a margin of half the range; no fixed pixel width; a fixed rendered height of 280px, so a network that changes extent never resizes the card (dsa-course Section 12 rule).
   - Links are lines. `broken` is dashed; `virtual` is dotted and carries its own label ("tunnel", "toward D"); a link with `quality` shows the value on hover and focus; a link with `bandwidth` always shows it.
@@ -339,7 +348,7 @@ Each subsection gives the variant, the snapshot fields beyond `NetSnapshot`, the
 
 Descriptions are templates. Backticked `{names}` are filled in; counts pluralize (`1 hop`, `2 hops`). A table row marked "per …" repeats once per item in the tie-break order of Section 7.2. Where a slide gives the seed, the section cites it; the positions and links are the slide's `graf:` block, and roles come from its `peran:` line mapped to the Section 7.2 roles (the slides reuse `mpr` for any ringed node), except where an operation computes them, as Elect does in Section 10.6.
 
-Every topic has a `structure.ts` whose messages, invariants, and per-node state follow Section 7.3. The subsections list the live fields; the Protocol tab content is written from the English reference when the topic is implemented.
+Every topic has a `live-fields.ts` and an `ns3.ts` (Section 7.3). The subsections list the live fields.
 
 ### 10.1 Multihop links and bridges, `/topic/multihop` (Week 1)
 
@@ -504,7 +513,7 @@ A changed row at the receiver gets `changed = true`, so its next incremental upd
 12         queue.extend(changed_neighbors(v, queue))  # tables that changed, not yet queued
 ```
 
-`u` moves to `near`'s position plus (0.8, 0) and its links follow the unit disk rule at `range`. Stale-route removal stands in for the table's install-time column, which the slide says exists to remove stale routes. Line 7 exists because an incremental update carries only changed rows, so without it a node that has just arrived would never learn routes that did not change; the slides do not describe this case, and the Protocol tab marks it as this demo's rule. The course reference does not fix how far a node raises its own sequence number; this demo adds 1, and the Protocol tab says so.
+`u` moves to `near`'s position plus (0.8, 0) and its links follow the unit disk rule at `range`. Stale-route removal stands in for the table's install-time column, which the slide says exists to remove stale routes. Line 7 exists because an incremental update carries only changed rows, so without it a node that has just arrived would never learn routes that did not change; the slides do not describe this case, and the Scenario tab marks it as this demo's rule. The course reference does not fix how far a node raises its own sequence number; this demo adds 1, and the Scenario tab says so.
 
 | Trigger | Line | Description | Highlight |
 |---|---|---|---|
@@ -924,7 +933,7 @@ interface AddressExtra {
 }
 ```
 
-The 16-address space is this demo's choice so every address fits on screen; the Protocol tab says so.
+The 16-address space is this demo's choice so every address fits on screen; the Scenario tab says so.
 
 **Seed:** nodes A (0,0), B (1,0), C (2,0); links A-B, B-C. Buddy: A holds 1 to 8 (address 1), B holds 9 to 12 (address 9), C holds 13 to 16 (address 13), the state after A started with the whole space and B joined through A, then C through B. QDAD: A 5, B 11, C 2 (fixed seed values). The separate partition is P (4,0) and Q (5,0) linked P-Q, with addresses P 1, Q 9 under Buddy (P holds 1 to 8 and Q 9 to 16, since their own first node started from the whole space) and P 11, Q 3 under QDAD.
 
@@ -1022,7 +1031,7 @@ Every AREQ counts once per node that transmits it (every node `{new}` can reach,
 7          join(x, via=x.first_configured_neighbor())
 ```
 
-Steps: "The partition has already merged." (line 1); "The partition with `{nodes}` comes into range: `{m}` links to `{first}`." (line 2, `{m}` the main-network node nearest the partition's first node, C on the seed); per conflict in address order, "`{y}` and `{x}` both use address `{a}`." (line 4, `{y}` from the main network) and the Join steps of the active scheme at line 7, through `{x}`'s first neighbor in node order that has an address and no pending conflict; "`{k}` conflicts were found and resolved." or "No address is used twice." (line 3). On the seed Buddy finds 2 conflicts (A and P on 1, B and Q on 9): P rejoins through C and takes 15, then Q through P and takes 16. QDAD finds 1 (B and P on 11). This matches what Week 4 says about partitions: query-based DAD cannot guarantee a unique address when the delay across a partition has no bound, and MANETconf gives each partition an id so that two nodes can tell when a merge happens (Misra pp. 338-341). The Protocol tab points to MANETconf for that reason.
+Steps: "The partition has already merged." (line 1); "The partition with `{nodes}` comes into range: `{m}` links to `{first}`." (line 2, `{m}` the main-network node nearest the partition's first node, C on the seed); per conflict in address order, "`{y}` and `{x}` both use address `{a}`." (line 4, `{y}` from the main network) and the Join steps of the active scheme at line 7, through `{x}`'s first neighbor in node order that has an address and no pending conflict; "`{k}` conflicts were found and resolved." or "No address is used twice." (line 3). On the seed Buddy finds 2 conflicts (A and P on 1, B and Q on 9): P rejoins through C and takes 15, then Q through P and takes 16. QDAD finds 1 (B and P on 11). This matches what Week 4 says about partitions: query-based DAD cannot guarantee a unique address when the delay across a partition has no bound, and MANETconf gives each partition an id so that two nodes can tell when a merge happens (Misra pp. 338-341). The Scenario tab points to MANETconf for that reason.
 
 The canvas draws each node's address under it (Buddy adds its pool on a second line, "1–8"; the spoken label reads "address 1, pool 1 to 8") through `NetworkCanvas`'s `nodeLabels` prop, and the partition as faded nodes without their link until Merge.
 
@@ -1048,7 +1057,7 @@ interface MobilityExtra {
 }
 ```
 
-**Parameters** (this demo's choices, shown in the Protocol tab): 8 nodes, area 10 × 6, `range = 2.5`, speed drawn from 0.3 to 1.0 units per tick (a minimum above zero, because Week 5 warns that `vmin = 0` drags the average speed down), pause drawn from 0 to 2 ticks. RPGM: two groups of four; each member does random waypoint without pauses inside a disc of radius 1 around its group's reference point; each reference point walks a fixed path of four corners of the area, one unit per tick, group 2 starting at the opposite corner (Misra 10.3.2).
+**Parameters** (this demo's choices, shown in the Scenario tab): 8 nodes, area 10 × 6, `range = 2.5`, speed drawn from 0.3 to 1.0 units per tick (a minimum above zero, because Week 5 warns that `vmin = 0` drags the average speed down), pause drawn from 0 to 2 ticks. RPGM: two groups of four; each member does random waypoint without pauses inside a disc of radius 1 around its group's reference point; each reference point walks a fixed path of four corners of the area, one unit per tick, group 2 starting at the opposite corner (Misra 10.3.2).
 
 **Seed:** `seed = 5`, positions drawn from it; the test pins the positions after 10 ticks for both models.
 
@@ -1116,7 +1125,7 @@ Steps: "`{k}` of `{n}` recorded positions fall in the centre quarter of the area
 
 ### 10.9 Network models and evaluation, `/topic/evaluation` (Week 6)
 
-**Variant:** `graph: "udg" | "qudg"` (default `"udg"`), labeled Unit disk graph and Quasi unit disk graph. The QUDG rule is Section 7.2's, with `q = 0.8`, a demo value the Protocol tab names.
+**Variant:** `graph: "udg" | "qudg"` (default `"udg"`), labeled Unit disk graph and Quasi unit disk graph. The QUDG rule is Section 7.2's, with `q = 0.8`, a demo value the Scenario tab names.
 
 **Snapshot:** `NetSnapshot` plus `seed: number`, `marked: string[]`, `cds: string[]`.
 
@@ -1432,7 +1441,7 @@ The dsa-course pattern, unchanged except for names:
 
 1. Write or extend the English reference for the week, get it to `status: reviewed`, and give the new subsection a `{#slug}`.
 2. Write the Section 10 subsection first: variant, snapshot, seed (from a slide `graf:` block where one exists), pseudocode, step table, live fields, and the seed results the test will pin. Write the narration in the Section 18 house style.
-3. Create `src/topics/<slug>/` with `index.ts`, `types.ts`, `operations.ts`, `operations.test.ts`, `pseudocode.ts`, `structure.ts`, `canvas.tsx`, `content.ts`. Draw with `NetworkCanvas`; use `src/lib/net.ts` for snapshot helpers and `src/lib/sim/` for placement, links, mobility, and runs.
+3. Create `src/topics/<slug>/` with `index.ts`, `types.ts`, `operations.ts`, `operations.test.ts`, `pseudocode.ts`, `live-fields.ts`, `ns3.ts`, `canvas.tsx`, `content.ts`, and the script `ns3/<slug>.cc` with its `ns3/runs.json` entry and captured output (Section 7.3). Draw with `NetworkCanvas`; use `src/lib/net.ts` for snapshot helpers and `src/lib/sim/` for placement, links, mobility, and runs.
 4. Add the seed inputs to `src/topics/test-inputs.ts`, register the module in `registry.ts` at its week position, and run `node scripts/extract-content.mjs`.
 5. Nothing else changes: the sidebar, pages, shell, and step engine are generic over `TopicModule`.
 
@@ -1458,6 +1467,7 @@ The tracker for every module. A row reaches **Specified** only when its full Sec
 | Case study `community-mesh` | 7–8 | uses Weeks 7–8 | Specified, 19.3 | Implemented |
 | Beginner layer (Section 20): Start here, glossary | all | uses Week 1 | Specified, 20 | Implemented |
 | Beginner layer: story and why, every topic and case study | 1–8 | reviewed | Specified, 20 | Implemented |
+| ns-3 scripts, every topic (Section 7.3) | 1–8 | uses Week 6 | Specified, 7.3 | Implemented |
 | Multicast (ODMRP mesh, MAODV tree) | 3 | draft (§3.2 of Week 3) | Not specified | not started |
 | Node cooperation (CONFIDANT, CORE, OCEAN) | 4 | draft (§3.2 of Week 4) | Not specified | not started |
 
@@ -1469,11 +1479,11 @@ Suggested build order: the shell and `NetworkCanvas` with `multihop`, then `reac
 - [ ] Every operation animates through its full step sequence and the code panel highlights the correct pseudocode line at every step.
 - [ ] `CodePanel` shows one Python listing with no tab strip; no line clips on desktop or at 400px, and the listing has no horizontal scroll.
 - [ ] Play, pause, step forward, step backward, speed, and scrub work against the precomputed step array; Randomize and Reset are instant.
-- [ ] Every variant toggle swaps the operation list, the seed where the section says so, and the "on the canvas" badge in the Protocol tab.
+- [ ] Every variant toggle swaps the operation list, the seed where the section says so, and the command and output in the ns-3 tab.
 - [ ] Every seed that comes from a slide matches the slide's `graf:` block: node set, links, roles, and dashed links.
 - [ ] Every metrics run returns the same numbers for the same seed, pinned in `src/lib/sim/metrics.test.ts`, and the canvas labels them as computed by this simulator.
 - [ ] Core Material renders on each topic page from a reviewed English reference; a draft reference blocks generation. Each topic opens on its Scenario tab (Section 20).
-- [ ] The Protocol tab lists the messages with costs from the reference (or "Not stated in the course reference."), the invariants, and the per-node state, and the live fields row tracks the step shown.
+- [ ] The ns-3 tab shows the topic's script with Download, and the command and captured output for the variant on the canvas; `npm run ns3:check` passes; the live fields row tracks the step shown.
 - [ ] Each Section 19 case study is reachable at `/case-study/:slug`, listed after the weeks, passes its `operations.test.ts` and `src/case-studies/case-studies.test.ts`, keeps the layout contract in `e2e/case-study-page.spec.ts`, and its quiz can be finished and retried by keyboard.
 - [ ] The Section 12 layout contract passes `npm run test:e2e` at desktop, tablet, and phone widths.
 - [ ] `npm run lint` (ESLint and `lint:copy`) passes, and the antislop Delivery Gate record for the release is in `anti-slop/`.
@@ -1491,7 +1501,7 @@ Suggested build order: the shell and `NetworkCanvas` with `multihop`, then `reac
 
 This section is mandatory and not open for negotiation. It is dsa-course Section 18, restated so this project is complete on its own. Every piece of text this project produces is held to the antislop rule set: the core (`antislop:antislop`) and the copywriting skill (`antislop:antislop-copywriting`); code comments are also held to `antislop:antislop-code`. Usage mode is DURING: the rules apply while writing. A change that fails the antislop Delivery Gate is not merged, however small.
 
-**What it covers.** UI strings, step narration (`Step.description` and `variables`), placeholders, empty and error states, aria-labels, page titles, pseudocode comments, code comments, README, this specification, `CLAUDE.md`, the audit records in `anti-slop/`, the English references in `references/en/`, and the case study copy. The Indonesian slides in `references/id/` are outside it because they are frozen upstream material.
+**What it covers.** UI strings, step narration (`Step.description` and `variables`), placeholders, empty and error states, aria-labels, page titles, pseudocode comments, code comments, README, this specification, `CLAUDE.md`, the audit records in `anti-slop/`, the English references in `references/en/`, the case study copy, and the ns-3 scripts, their notes, and their captured output in `ns3/`. The Indonesian slides in `references/id/` are outside it because they are frozen upstream material.
 
 **Hard rules:**
 

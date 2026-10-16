@@ -1,0 +1,5 @@
+model rwp, seed 5, 200 s sampled once a second
+links appeared or broke 531 times
+a link lasted 6.6 s on average
+58.5 % of node pairs had a path
+44.3 % of node time was in the centre quarter

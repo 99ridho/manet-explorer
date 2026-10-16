@@ -5,7 +5,7 @@ import { scenario } from './content'
 import { ROUTING_LABEL, meshOperations, randomNetwork, seedNetwork } from './operations'
 import { meshPseudocode } from './pseudocode'
 import { cast } from './story'
-import { meshStructure } from './structure'
+import { meshLiveFields } from './live-fields'
 import type { MeshSnapshot, MeshState, Routing } from './types'
 
 const asRouting = (v?: string): Routing => (v === 'hop' ? 'hop' : 'etx-watchdog')
@@ -18,7 +18,7 @@ export const meshSimulator: TopicModule<MeshState, MeshSnapshot> = {
   pseudocode: meshPseudocode,
   CanvasComponent: MeshCanvas,
   content: { coreMaterial: '' },
-  structure: meshStructure,
+  liveFields: meshLiveFields,
   variant: {
     id: 'routing',
     label: 'Routing',

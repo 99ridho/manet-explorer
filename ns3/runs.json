@@ -1,0 +1,13 @@
+{
+  "multihop": { "arg": "model", "values": ["disk", "shadowing"] },
+  "proactive-routing": {},
+  "reactive-routing": { "arg": "protocol", "values": ["aodv", "dsr"] },
+  "broadcast": { "arg": "relay", "values": ["mpr", "flooding"] },
+  "geographic-routing": { "arg": "recovery", "values": ["perimeter", "none"] },
+  "clustering": { "arg": "rule", "values": ["highest", "lowest"] },
+  "address-allocation": { "arg": "scheme", "values": ["buddy", "qdad"] },
+  "mobility": { "arg": "model", "values": ["rwp", "rpgm"] },
+  "evaluation": { "arg": "graph", "values": ["udg", "qudg"] },
+  "qos-routing": { "arg": "metric", "values": ["bandwidth", "etx", "energy", "hop"] },
+  "routing-attacks": { "arg": "attacker", "values": ["blackhole", "wormhole", "none"] }
+}

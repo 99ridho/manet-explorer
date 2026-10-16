@@ -1,0 +1,13 @@
+graph qudg
+seed network, range 1.2 units, links: B-C B-D E-G F-H (4)
+seed 1: 100.0 % delivered
+seed 2: 66.7 % delivered
+seed 3: 66.7 % delivered
+seed 4: 100.0 % delivered
+seed 5: 66.7 % delivered
+seed 6: 66.7 % delivered
+seed 7: 0.0 % delivered
+seed 8: 0.0 % delivered
+seed 9: 66.7 % delivered
+seed 10: 100.0 % delivered
+over 10 seeds: mean 63.3 %, standard deviation 34.8

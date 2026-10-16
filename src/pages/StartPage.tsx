@@ -33,7 +33,8 @@ const howPages = `Every topic page works like the walkthrough above.
 - The **Scenario** tab tells a real-world story for the network on the canvas and lists what to try, in order. Start there.
 - The **Code** card shows the steps as Python-like pseudocode and highlights the line each step runs. Under the step you get the **Why**.
 - A word with a dotted underline opens a short definition when you click or tap it.
-- **Core Material** is the course notes for the week, with the book pages they come from. **Protocol** lists the messages and the state each node keeps.`
+- **Core Material** is the course notes for the week, with the book pages they come from.
+- The **ns-3** tab holds a short script for the ns-3 network simulator that builds the same network over a modeled radio. Run it on your own machine to see the mechanism with real frames, collisions, and retries.`
 
 export function StartPage() {
   const basics = glossary.filter((g) => BASICS.includes(g.term))

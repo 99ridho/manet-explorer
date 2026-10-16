@@ -1,0 +1,14 @@
+attacker none
+t = 1021 ms: S gets an RREP with S A B D
+S uses the first route to arrive: S A B D
+packet 1: S hears A pass it on
+packet 2: S hears A pass it on
+packet 3: S hears A pass it on
+packet 4: S hears A pass it on
+packet 5: S hears A pass it on
+packet 6: S hears A pass it on
+packet 7: S hears A pass it on
+packet 8: S hears A pass it on
+packet 9: S hears A pass it on
+packet 10: S hears A pass it on
+D received 10 of 10 packets

@@ -1,0 +1,24 @@
+model shadowing, seed 1, range 100 m (2 units at 50 m per unit)
+Hellos heard, out of 50 sent by each node:
+  A hears B 24 C 37 D 4 E 1
+  B hears A 34 C 40 D 6 E 2 F 1
+  C hears A 36 B 40 D 29 E 8 F 6
+  D hears A 4 B 2 C 24 E 34 F 38
+  E hears A 3 B 2 C 6 D 35 F 29
+  F hears A 3 B 1 C 6 D 34 E 21
+Links (each end heard the other):
+  A-B  delivery 0.68 and 0.48, ETX 3.06
+  A-C  delivery 0.72 and 0.74, ETX 1.88
+  A-D  delivery 0.08 and 0.08, ETX 156.25
+  A-E  delivery 0.06 and 0.02, ETX 833.33
+  B-C  delivery 0.80 and 0.80, ETX 1.56
+  B-D  delivery 0.04 and 0.12, ETX 208.33
+  B-E  delivery 0.04 and 0.04, ETX 625.00
+  B-F  delivery 0.02 and 0.02, ETX 2500.00
+  C-D  delivery 0.48 and 0.58, ETX 3.59
+  C-E  delivery 0.12 and 0.16, ETX 52.08
+  C-F  delivery 0.12 and 0.12, ETX 69.44
+  D-E  delivery 0.70 and 0.68, ETX 2.10
+  D-F  delivery 0.68 and 0.76, ETX 1.93
+  E-F  delivery 0.42 and 0.58, ETX 4.11
+14 links among 6 nodes

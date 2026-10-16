@@ -4,8 +4,9 @@ import { GeoCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { geoOperations, randomNetwork, seedNetwork } from './operations'
 import { geoPseudocode } from './pseudocode'
+import { geoNs3 } from './ns3'
 import { story } from './story'
-import { geoStructure } from './structure'
+import { geoLiveFields } from './live-fields'
 import type { GeoSnapshot, GeoState, Recovery } from './types'
 
 const asRecovery = (v?: string): Recovery => (v === 'none' ? 'none' : 'perimeter')
@@ -18,7 +19,7 @@ export const geographicRouting: TopicModule<GeoState, GeoSnapshot> = {
   pseudocode: geoPseudocode,
   CanvasComponent: GeoCanvas,
   content: { coreMaterial },
-  structure: geoStructure,
+  liveFields: geoLiveFields,
   variant: {
     id: 'recovery',
     label: 'Void handling',
@@ -31,4 +32,5 @@ export const geographicRouting: TopicModule<GeoState, GeoSnapshot> = {
   createInitialState: (variant) => seedNetwork(asRecovery(variant)),
   randomize: (_state, variant) => randomNetwork(asRecovery(variant), newSeed()),
   story,
+  ns3: geoNs3,
 }

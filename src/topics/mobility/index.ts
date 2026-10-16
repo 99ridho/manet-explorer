@@ -4,8 +4,9 @@ import { MobilityCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { MODEL_LABEL, mobilityOperations, seedNetwork } from './operations'
 import { mobilityPseudocode } from './pseudocode'
+import { mobilityNs3 } from './ns3'
 import { story } from './story'
-import { mobilityStructure } from './structure'
+import { mobilityLiveFields } from './live-fields'
 import type { MobilitySnapshot, MobilityState, Model } from './types'
 
 const asModel = (v?: string): Model => (v === 'rpgm' ? 'rpgm' : 'rwp')
@@ -18,7 +19,7 @@ export const mobility: TopicModule<MobilityState, MobilitySnapshot> = {
   pseudocode: mobilityPseudocode,
   CanvasComponent: MobilityCanvas,
   content: { coreMaterial },
-  structure: mobilityStructure,
+  liveFields: mobilityLiveFields,
   variant: {
     id: 'model',
     label: 'Model',
@@ -31,4 +32,5 @@ export const mobility: TopicModule<MobilityState, MobilitySnapshot> = {
   createInitialState: (variant) => seedNetwork(asModel(variant)),
   randomize: (_state, variant) => seedNetwork(asModel(variant), newSeed()),
   story,
+  ns3: mobilityNs3,
 }

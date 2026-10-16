@@ -4,8 +4,9 @@ import { BroadcastCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { broadcastOperations, randomNetwork, seedNetwork } from './operations'
 import { broadcastPseudocode } from './pseudocode'
+import { broadcastNs3 } from './ns3'
 import { story } from './story'
-import { broadcastStructure } from './structure'
+import { broadcastLiveFields } from './live-fields'
 import type { BroadcastSnapshot, BroadcastState, Relay } from './types'
 
 const asRelay = (v?: string): Relay => (v === 'flooding' ? 'flooding' : 'mpr')
@@ -18,7 +19,7 @@ export const broadcast: TopicModule<BroadcastState, BroadcastSnapshot> = {
   pseudocode: broadcastPseudocode,
   CanvasComponent: BroadcastCanvas,
   content: { coreMaterial },
-  structure: broadcastStructure,
+  liveFields: broadcastLiveFields,
   variant: {
     id: 'relay',
     label: 'Relays',
@@ -31,4 +32,5 @@ export const broadcast: TopicModule<BroadcastState, BroadcastSnapshot> = {
   createInitialState: (variant) => seedNetwork(asRelay(variant)),
   randomize: (_state, variant) => randomNetwork(asRelay(variant), newSeed()),
   story,
+  ns3: broadcastNs3,
 }

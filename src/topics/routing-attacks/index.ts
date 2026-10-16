@@ -4,8 +4,9 @@ import { AttacksCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { attacksOperations, randomNetwork, seedNetwork } from './operations'
 import { attacksPseudocode } from './pseudocode'
+import { attacksNs3 } from './ns3'
 import { story } from './story'
-import { attacksStructure } from './structure'
+import { attacksLiveFields } from './live-fields'
 import type { AttackSnapshot, AttackState, Attacker } from './types'
 
 const asAttacker = (v?: string): Attacker => (v === 'wormhole' || v === 'none' ? v : 'blackhole')
@@ -18,7 +19,7 @@ export const routingAttacks: TopicModule<AttackState, AttackSnapshot> = {
   pseudocode: attacksPseudocode,
   CanvasComponent: AttacksCanvas,
   content: { coreMaterial },
-  structure: attacksStructure,
+  liveFields: attacksLiveFields,
   variant: {
     id: 'attacker',
     label: 'Attacker',
@@ -32,4 +33,5 @@ export const routingAttacks: TopicModule<AttackState, AttackSnapshot> = {
   createInitialState: (variant) => seedNetwork(asAttacker(variant)),
   randomize: (_state, variant) => randomNetwork(asAttacker(variant), newSeed()),
   story,
+  ns3: attacksNs3,
 }

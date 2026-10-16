@@ -4,8 +4,9 @@ import { ClusterCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { clusterOperations, randomNetwork, seedNetwork } from './operations'
 import { clusterPseudocode } from './pseudocode'
+import { clusterNs3 } from './ns3'
 import { story } from './story'
-import { clusterStructure } from './structure'
+import { clusterLiveFields } from './live-fields'
 import type { ClusterSnapshot, ClusterState, Rule } from './types'
 
 const asRule = (v?: string): Rule => (v === 'lowest' ? 'lowest' : 'highest')
@@ -18,7 +19,7 @@ export const clustering: TopicModule<ClusterState, ClusterSnapshot> = {
   pseudocode: clusterPseudocode,
   CanvasComponent: ClusterCanvas,
   content: { coreMaterial },
-  structure: clusterStructure,
+  liveFields: clusterLiveFields,
   variant: {
     id: 'rule',
     label: 'ID rule',
@@ -31,4 +32,5 @@ export const clustering: TopicModule<ClusterState, ClusterSnapshot> = {
   createInitialState: (variant) => seedNetwork(asRule(variant)),
   randomize: (_state, variant) => randomNetwork(asRule(variant), newSeed()),
   story,
+  ns3: clusterNs3,
 }

@@ -150,18 +150,21 @@ test.describe('desktop (lg)', () => {
     expect(ring).not.toBe('none')
   })
 
-  test('the Protocol tab scrolls in place and marks the per-node state on the canvas', async ({ page }) => {
+  test('the ns-3 tab scrolls in place and shows the output of the variant on the canvas', async ({ page }) => {
     await page.goto('/topic/multihop')
     await expect(card(page, 'Operation')).toBeVisible()
-    await page.getByRole('tab', { name: 'Protocol' }).click()
+    await page.getByRole('tab', { name: 'ns-3' }).click()
     const doc = await documentScroll(page)
     expect(doc.scrollHeight).toBe(doc.clientHeight)
     expect(await page.locator(ACTIVE_PANEL).evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto')
     await expect(page.locator(LIVE_FIELDS)).toContainText('nodes = 6')
-    await expect(page.locator('[data-representation="disk"]')).toContainText('on the canvas')
+    await expect(page.locator('[data-ns3-output="disk"]')).toContainText('7 links among 6 nodes')
+    await expect(page.locator(ACTIVE_PANEL)).toContainText('./ns3 run "multihop --model=disk"')
     await page.getByRole('tab', { name: 'Shadowing' }).click()
-    await expect(page.locator('[data-representation="shadowing"]')).toContainText('on the canvas')
-    await expect(page.locator('[data-representation="disk"]')).not.toContainText('on the canvas')
+    await expect(page.locator('[data-ns3-output="shadowing"]')).toContainText('model shadowing')
+    await expect(page.locator(ACTIVE_PANEL)).toContainText('./ns3 run "multihop --model=shadowing"')
+    const download = page.getByRole('link', { name: 'Download multihop.cc' })
+    await expect(download).toHaveAttribute('download', 'multihop.cc')
   })
 
   test('the live fields follow the step being shown', async ({ page }) => {
@@ -223,11 +226,13 @@ test.describe('phone', () => {
     })
   })
 
-  test('the Protocol tab fits the width', async ({ page }) => {
+  test('the ns-3 tab fits the width', async ({ page }) => {
     await page.goto('/topic/reactive-routing')
     await expect(card(page, 'Operation')).toBeVisible()
-    await page.getByRole('tab', { name: 'Protocol' }).click()
-    await expect(page.locator(ACTIVE_PANEL)).toContainText('AODV next-hop table')
+    await page.getByRole('tab', { name: 'ns-3' }).click()
+    await expect(page.locator('[data-ns3-output="aodv"]')).toContainText('through S A C D')
+    const listing = page.locator('ol[aria-labelledby="ns3-script"]')
+    expect(await listing.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
     expect((await documentScroll(page)).scrollWidth).toBe(400)
   })
 

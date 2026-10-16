@@ -1,0 +1,6 @@
+protocol dsr
+t = 8 s: S reaches D through S B E D
+t = 10 s: link E-D breaks
+t = 25 s: S reaches D through S A C D
+S got 24 of 25 echo replies
+11 RREQ and RERR broadcasts in all

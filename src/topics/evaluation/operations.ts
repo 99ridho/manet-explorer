@@ -13,7 +13,7 @@ import { WHY } from './why'
 
 type Result = OperationResult<EvaluationSnapshot>
 
-/** The QUDG inner radius as a share of the range: this demo's value, named in the Protocol tab. */
+/** The QUDG inner radius as a share of the range: this demo's value, named in the Scenario tab. */
 export const Q = 0.8
 const RANGE = 1.2
 export const GRAPH_LABEL: Record<Graph, string> = { udg: 'UDG', qudg: 'QUDG' }

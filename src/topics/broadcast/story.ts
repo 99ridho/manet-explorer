@@ -34,5 +34,9 @@ The simplest way is *blind flooding*: every phone that hears the alarm for the f
 3. Switch to **Blind flooding** and run **Broadcast** from \`A\` again. Every phone now repeats the alarm. Compare the counts: the same people hear it, at a higher cost.
 4. Switch back to **MPR relays**. The lab loses contact with the sports field: choose **Remove link**, type \`D F\`, and press **Go**. A now needs the canteen (E) as a relay too.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+Two-hop information comes from beacons (Misra p. 125); this demo recomputes every MPR set as soon as a link changes.`,
 }

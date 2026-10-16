@@ -1,0 +1,3 @@
+metric bandwidth: path A B C E (ETX 3.70, weakest relay battery 20.00)
+B's battery ran out at 121 s, so its radio turns off
+E received 239 of 600 packets; the radios sent 912 data frames, retries included

@@ -5,7 +5,7 @@ import { scenario } from './content'
 import { RELAY_LABEL, randomNetwork, sarOperations, seedNetwork } from './operations'
 import { sarPseudocode } from './pseudocode'
 import { cast } from './story'
-import { sarStructure } from './structure'
+import { sarLiveFields } from './live-fields'
 import type { Relay, SarSnapshot, SarState } from './types'
 
 const asRelay = (v?: string): Relay => (v === 'flooding' ? 'flooding' : 'mpr')
@@ -18,7 +18,7 @@ export const sarSimulator: TopicModule<SarState, SarSnapshot> = {
   pseudocode: sarPseudocode,
   CanvasComponent: SarCanvas,
   content: { coreMaterial: '' },
-  structure: sarStructure,
+  liveFields: sarLiveFields,
   variant: {
     id: 'relay',
     label: 'Relays',

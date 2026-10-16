@@ -25,7 +25,7 @@ Before choosing a routing protocol for this search, the organizers want to know 
 - **A, B, C, D**: the searchers of team 1.
 - **E, F, G, H**: the searchers of team 2.
 
-The area (10 × 6), the radio range (2.5), the speeds, and the pauses are this demo's choices; the Protocol tab lists them.
+The 8 nodes, the area (10 × 6), the radio range (2.5), the pauses of 0 to 2 ticks, and the two groups of four are this demo's choices. With vmin at zero the average speed keeps falling, so this demo draws speeds from 0.3 to 1.0 units per tick (Misra p. 241).
 
 ## Why the model matters
 
@@ -38,5 +38,9 @@ The area (10 × 6), the radio range (2.5), the speeds, and the pauses are this d
 3. Switch to **Group (RPGM)** and advance \`10\` ticks. Teams move together, so the links inside a team last longer. Compare the **changes** and **lasts** live fields.
 4. Choose **Metrics run** and press **Go**. The same four message flows run under both models, and the bars compare delivery, delay, and overhead.
 
-Read the **Why** line under each step. It says the reason for what happens.`,
+Read the **Why** line under each step. It says the reason for what happens.
+
+## This demo's choices
+
+The metrics run sends one packet per tick on an AODV-style route that is found again when it breaks; a failed discovery is retried 2 ticks later. These are this simulator's rules, not the books'.`,
 }

@@ -4,8 +4,9 @@ import { MultihopCanvas } from './canvas'
 import { coreMaterial } from './content'
 import { multihopOperations, randomNetwork, seedNetwork } from './operations'
 import { multihopPseudocode } from './pseudocode'
+import { multihopNs3 } from './ns3'
 import { story } from './story'
-import { multihopStructure } from './structure'
+import { multihopLiveFields } from './live-fields'
 import type { LinkModel, MultihopSnapshot, MultihopState } from './types'
 
 const asModel = (v?: string): LinkModel => (v === 'shadowing' ? 'shadowing' : 'disk')
@@ -18,7 +19,7 @@ export const multihop: TopicModule<MultihopState, MultihopSnapshot> = {
   pseudocode: multihopPseudocode,
   CanvasComponent: MultihopCanvas,
   content: { coreMaterial },
-  structure: multihopStructure,
+  liveFields: multihopLiveFields,
   variant: {
     id: 'model',
     label: 'Link model',
@@ -31,4 +32,5 @@ export const multihop: TopicModule<MultihopState, MultihopSnapshot> = {
   createInitialState: (variant) => seedNetwork(asModel(variant)),
   randomize: (_state, variant) => randomNetwork(asModel(variant), newSeed()),
   story,
+  ns3: multihopNs3,
 }

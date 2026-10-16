@@ -10,7 +10,8 @@
     "lint:copy": "node scripts/check-copy.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ns3:check": "node scripts/ns3-check.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

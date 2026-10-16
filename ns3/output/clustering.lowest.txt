@@ -1,0 +1,8 @@
+rule lowest
+  node 9 joins head 2, gateway between heads 2 4 6
+  node 4 is a cluster head
+  node 2 is a cluster head
+  node 6 is a cluster head
+  node 8 joins head 3, gateway between heads 3 5 6
+  node 3 is a cluster head
+  node 5 is a cluster head

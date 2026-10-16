@@ -4,7 +4,7 @@ import { Navigate, useParams } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MarkdownContent } from '@/components/MarkdownContent'
-import { ProtocolPanel } from '@/components/ProtocolPanel'
+import { Ns3Panel } from '@/components/Ns3Panel'
 import { VisualizerShell } from '@/components/visualizer/VisualizerShell'
 import { getTopic } from '@/topics/registry'
 import type { TopicModule } from '@/types/step-engine'
@@ -20,7 +20,7 @@ export function TopicPage() {
 }
 
 function TopicView({ topic }: { topic: TopicModule }) {
-  // Mirror of the shell's variant, so the Protocol tab can mark the representation on the canvas.
+  // Mirror of the shell's variant, so the ns-3 tab shows the command and output for the variant on the canvas.
   const [variant, setVariant] = useState<string | undefined>(topic.variant?.default)
 
   return (
@@ -53,9 +53,11 @@ function TopicView({ topic }: { topic: TopicModule }) {
               <TabsTrigger value="core" className="flex-1">
                 Core Material
               </TabsTrigger>
-              <TabsTrigger value="protocol" className="flex-1">
-                Protocol
-              </TabsTrigger>
+              {topic.ns3 && (
+                <TabsTrigger value="ns3" className="flex-1">
+                  ns-3
+                </TabsTrigger>
+              )}
             </TabsList>
             <TabsContent value="scenario" className="lg:min-h-0 lg:overflow-y-auto lg:pr-2">
               <MarkdownContent markdown={topic.story.scenario} glossary />
@@ -63,14 +65,11 @@ function TopicView({ topic }: { topic: TopicModule }) {
             <TabsContent value="core" className="lg:min-h-0 lg:overflow-y-auto lg:pr-2">
               <MarkdownContent markdown={topic.content.coreMaterial} />
             </TabsContent>
-            <TabsContent value="protocol" className="lg:min-h-0 lg:overflow-y-auto lg:pr-2">
-              <ProtocolPanel
-                structure={topic.structure}
-                variant={variant}
-                variantConfig={topic.variant}
-                operations={topic.operations}
-              />
-            </TabsContent>
+            {topic.ns3 && (
+              <TabsContent value="ns3" className="lg:min-h-0 lg:overflow-y-auto lg:pr-2">
+                <Ns3Panel script={topic.ns3} variant={variant} variantConfig={topic.variant} />
+              </TabsContent>
+            )}
           </Tabs>
         </section>
       </div>

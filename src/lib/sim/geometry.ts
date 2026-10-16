@@ -12,7 +12,7 @@ export function unitDiskLinked(d: number, range: number): boolean {
 
 /** Free-space exponent from the Week 1 slide. */
 export const PATH_LOSS_N = 2
-/** SPEC §17 open item: a demo value until decided; the Protocol tab labels it. */
+/** SPEC §17 open item: a demo value until decided; the Scenario tab labels it. */
 export const SHADOWING_SIGMA = 4
 
 /** Margin in dB: 10·n·log10(range / d) + x. Linked when the margin is at least 0; at x = 0 this is the unit disk rule. */
